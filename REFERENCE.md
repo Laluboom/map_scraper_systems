@@ -73,11 +73,29 @@ standalone/
   requirements_standalone.txt — pip dependencies
   supplier_scraper.spec   — PyInstaller build spec
   templates/              — Jinja2 HTML templates (base, dashboard, contacts, send, scrape, logs)
+  .venv/                  — Python virtualenv (gitignored); activate before running
 
 REFERENCE.md              — this file
 TODO.md                   — task tracker
 PLACEHOLDERS.md           — all user-fillable values
 ```
+
+## Running the App (Development)
+
+```bash
+cd standalone
+
+# First time only
+python3 -m venv .venv
+.venv/bin/pip install -r requirements_standalone.txt
+
+# Every time
+.venv/bin/python cli.py status
+.venv/bin/python cli.py serve
+.venv/bin/python cli.py scrape --city "Dallas, TX"
+```
+
+> **Note:** `scrapy` and `selenium` are NOT in `requirements_standalone.txt` — they are legacy dependencies from the old Scrapy-based architecture and are unused in the Google Places flow.
 
 ---
 
