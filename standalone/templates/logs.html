@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Email Logs ({{ logs|length }})</h1>
+{% if logs %}
+<table>
+  <thead>
+    <tr><th>Trader ID</th><th>Status</th><th>Message ID</th><th>Error</th><th>Sent At</th></tr>
+  </thead>
+  <tbody>
+    {% for log in logs %}
+    <tr>
+      <td>{{ log.trader_id[:8] }}…</td>
+      <td><span class="badge badge-{{ log.status }}">{{ log.status }}</span></td>
+      <td>{{ log.message_id or "—" }}</td>
+      <td>{{ log.error_message or "—" }}</td>
+      <td>{{ log.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No logs yet. Send a campaign to see results here.</p>
+{% endif %}
+{% endblock %}

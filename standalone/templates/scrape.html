@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Run Scraper — Google Places</h1>
+
+{% if msg %}
+<div class="msg {% if error %}msg-err{% else %}msg-ok{% endif %}">{{ msg }}</div>
+{% endif %}
+
+<!-- Progress summary -->
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;margin-bottom:20px;">
+  <strong>Area Progress:</strong>
+  {{ done_areas }} / {{ total_areas }} city×term combinations searched
+  {% if total_areas > 0 %}
+  &nbsp;&nbsp;
+  <span style="display:inline-block;background:#e0e0e0;border-radius:4px;width:200px;height:12px;vertical-align:middle;">
+    <span style="display:block;background:#2a7;border-radius:4px;width:{{ pct }}%;height:12px;"></span>
+  </span>
+  &nbsp;{{ pct }}%
+  {% endif %}
+</div>
+
+<!-- Scrape controls -->
+<form method="post" action="/scrape/start" style="margin-bottom:24px;">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div>
+      <label style="display:block;font-size:13px;color:#555;margin-bottom:4px;">City (optional)</label>
+      <input name="city" placeholder='e.g. Dallas, TX' style="width:180px;padding:6px 10px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;">
+      <button class="btn btn-primary" type="submit" name="mode" value="city">Scrape City</button>
+      <button class="btn btn-primary" type="submit" name="mode" value="all">Scrape All US</button>
+      <button class="btn" type="submit" name="mode" value="resume" style="background:#6c757d;color:#fff;">Resume</button>
+    </div>
+  </div>
+  <p style="font-size:12px;color:#888;margin-top:8px;">
+    <strong>Scrape City</strong>: search a single city only.<br>
+    <strong>Scrape All US</strong>: iterate all {{ total_areas_possible }} city × term combinations from scratch.<br>
+    <strong>Resume</strong>: skip cities already searched within the last {{ rescrape_days }} days.
+  </p>
+</form>
+
+<!-- Recent results table -->
+{% if recent_areas %}
+<h2 style="font-size:16px;margin-bottom:8px;">Recently Scraped Areas</h2>
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+  <thead>
+    <tr style="background:#f0f0f0;">
+      <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #ddd;">City / Term</th>
+      <th style="text-align:right;padding:6px 10px;border-bottom:1px solid #ddd;">Results</th>
+      <th style="text-align:right;padding:6px 10px;border-bottom:1px solid #ddd;">Scraped At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for area in recent_areas %}
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:6px 10px;">{{ area.id | replace("|", " · ") }}</td>
+      <td style="text-align:right;padding:6px 10px;">{{ area.result_count }}</td>
+      <td style="text-align:right;padding:6px 10px;color:#777;">{{ area.scraped_at.strftime("%Y-%m-%d %H:%M") if area.scraped_at else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:#888;">No areas scraped yet. Run a scrape above to get started.</p>
+{% endif %}
+{% endblock %}

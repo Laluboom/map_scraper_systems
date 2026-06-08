@@ -1,0 +1,267 @@
+New York, NY
+Los Angeles, CA
+Chicago, IL
+Houston, TX
+Phoenix, AZ
+Philadelphia, PA
+San Antonio, TX
+San Diego, CA
+Dallas, TX
+San Jose, CA
+Austin, TX
+Jacksonville, FL
+Fort Worth, TX
+Columbus, OH
+Charlotte, NC
+Indianapolis, IN
+San Francisco, CA
+Seattle, WA
+Denver, CO
+Nashville, TN
+Oklahoma City, OK
+El Paso, TX
+Washington, DC
+Las Vegas, NV
+Louisville, KY
+Memphis, TN
+Portland, OR
+Baltimore, MD
+Milwaukee, WI
+Albuquerque, NM
+Tucson, AZ
+Fresno, CA
+Sacramento, CA
+Mesa, AZ
+Kansas City, MO
+Atlanta, GA
+Omaha, NE
+Colorado Springs, CO
+Raleigh, NC
+Long Beach, CA
+Virginia Beach, VA
+Minneapolis, MN
+Tampa, FL
+New Orleans, LA
+Arlington, TX
+Bakersfield, CA
+Honolulu, HI
+Anaheim, CA
+Aurora, CO
+Santa Ana, CA
+Corpus Christi, TX
+Riverside, CA
+St. Louis, MO
+Lexington, KY
+Pittsburgh, PA
+Stockton, CA
+Anchorage, AK
+Cincinnati, OH
+St. Paul, MN
+Greensboro, NC
+Toledo, OH
+Newark, NJ
+Plano, TX
+Henderson, NV
+Orlando, FL
+Chandler, AZ
+St. Petersburg, FL
+Laredo, TX
+Norfolk, VA
+Madison, WI
+Durham, NC
+Lubbock, TX
+Winston-Salem, NC
+Garland, TX
+Glendale, AZ
+Hialeah, FL
+Reno, NV
+Baton Rouge, LA
+Irvine, CA
+Chesapeake, VA
+Irving, TX
+Scottsdale, AZ
+North Las Vegas, NV
+Fremont, CA
+Gilbert, AZ
+San Bernardino, CA
+Birmingham, AL
+Rochester, NY
+Richmond, VA
+Spokane, WA
+Des Moines, IA
+Montgomery, AL
+Modesto, CA
+Fayetteville, NC
+Tacoma, WA
+Shreveport, LA
+Fontana, CA
+Moreno Valley, CA
+Glendale, CA
+Akron, OH
+Yonkers, NY
+Huntington Beach, CA
+Little Rock, AR
+Augusta, GA
+Grand Rapids, MI
+Columbus, GA
+Salt Lake City, UT
+Tallahassee, FL
+Huntsville, AL
+Worcester, MA
+Knoxville, TN
+Providence, RI
+Brownsville, TX
+Santa Clarita, CA
+Garden Grove, CA
+Oceanside, CA
+Chattanooga, TN
+Fort Lauderdale, FL
+Rancho Cucamonga, CA
+Santa Rosa, CA
+Port Arthur, TX
+Tempe, AZ
+Cape Coral, FL
+Oxnard, CA
+Eugene, OR
+Peoria, IL
+Salem, OR
+Cary, NC
+Corona, CA
+Springfield, MO
+Fort Collins, CO
+Jackson, MS
+Alexandria, VA
+Hayward, CA
+Lancaster, CA
+Salinas, CA
+Palmdale, CA
+Sunnyvale, CA
+Pomona, CA
+Escondido, CA
+Pasadena, TX
+Kansas City, KS
+Rockford, IL
+Torrance, CA
+Paterson, NJ
+Bridgeport, CT
+McAllen, TX
+Mesquite, TX
+Syracuse, NY
+Savannah, GA
+Surprise, AZ
+Roseville, CA
+Denton, TX
+Macon, GA
+Joliet, IL
+Clarksville, TN
+Lakewood, CO
+Killeen, TX
+Amarillo, TX
+Hollywood, FL
+Frisco, TX
+McKinney, TX
+Visalia, CA
+Waco, TX
+Olathe, KS
+Carrollton, TX
+Warren, MI
+Hampton, VA
+Dayton, OH
+Cedar Rapids, IA
+Topeka, KS
+Columbia, SC
+Sterling Heights, MI
+New Haven, CT
+Thousand Oaks, CA
+El Monte, CA
+Hartford, CT
+Sioux Falls, SD
+Fargo, ND
+Concord, CA
+Orange, CA
+Victorville, CA
+Peoria, AZ
+Elk Grove, CA
+Springfield, MA
+Coral Springs, FL
+Pembroke Pines, FL
+Springfield, IL
+Salem, MA
+Eugene, OR
+Clearwater, FL
+Independence, MO
+West Valley City, UT
+Murfreesboro, TN
+Beaumont, TX
+Arvada, CO
+Ann Arbor, MI
+Lansing, MI
+Inglewood, CA
+Rochester, MN
+Elgin, IL
+Flint, MI
+Waterbury, CT
+West Jordan, UT
+Downey, CA
+Costa Mesa, CA
+Miami Gardens, FL
+Manchester, NH
+Pueblo, CO
+Erie, PA
+Westminster, CO
+South Bend, IN
+Midland, TX
+Columbia, MO
+Glendale, CA
+Peoria, IL
+Provo, UT
+Athens, GA
+Wichita Falls, TX
+Norman, OK
+Antioch, CA
+Miramar, FL
+Temecula, CA
+Clovis, CA
+Costa Mesa, CA
+El Cajon, CA
+Lansing, MI
+Billings, MT
+Berkeley, CA
+Pompano Beach, FL
+High Point, NC
+West Palm Beach, FL
+Murrieta, CA
+Centennial, CO
+Round Rock, TX
+Odessa, TX
+Gainesville, FL
+Allentown, PA
+Lewisville, TX
+Palmdale, CA
+Lowell, MA
+Wilmington, NC
+Burbank, CA
+Beaumont, CA
+Jurupa Valley, CA
+Henderson, NV
+Richmond, CA
+Simi Valley, CA
+Inglewood, CA
+Broken Arrow, OK
+League City, TX
+Davie, FL
+Lakewood, CA
+Rialto, CA
+Clearfield, UT
+Norwalk, CA
+Arvada, CO
+Palm Bay, FL
+Boise, ID
+Billings, MT
+Spokane Valley, WA
+Akron, OH
+Layton, UT
+Thornton, CO
+Pasadena, CA
+Rancho Cucamonga, CA
+Tallahassee, FL

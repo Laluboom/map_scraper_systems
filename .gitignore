@@ -1,0 +1,16 @@
+.env
+standalone/config.ini
+standalone/*.db
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+*.log
+.scrapy/
+node_modules/
+frontend/build/
+.DS_Store
+*.sqlite3
