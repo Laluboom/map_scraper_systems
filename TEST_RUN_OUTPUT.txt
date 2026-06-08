@@ -1,0 +1,159 @@
+======================================================
+  FULL WORKFLOW TEST — supplier_scraper simulation
+  Sat Jun  6 09:55:08 PM BST 2026
+======================================================
+
+━━━ STEP 1: setup (first-time run) ━━━
+config.ini already exists at /home/lalu/Vellav/Hackathons_n_projects/supplier_gmap_scrape/standalone/config.ini
+
+━━━ STEP 2: status (fresh — empty DB) ━━━
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    0
+  Priority traders: 0
+  Approved:         0
+  Email-validated:  0
+  Emails sent:      0
+  Bounced:          0
+  Log entries:      0
+========================================
+
+━━━ STEP 3: simulate scrape output ━━━
+(In real use: supplier_scraper.exe scrape --source scrapmonster)
+Injecting 8 realistic trader records as a spider would produce...
+  Inserted 8 traders (5 priority, 3 general)
+
+━━━ STEP 4: status after scrape ━━━
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    8
+  Priority traders: 5
+  Approved:         0
+  Email-validated:  0
+  Emails sent:      0
+  Bounced:          0
+  Log entries:      0
+========================================
+
+━━━ STEP 5: validate emails ━━━
+(No API keys configured — validator falls back to 'assume valid')
+Validating 8 emails…
+Validation complete.
+
+━━━ STEP 6: status after validation ━━━
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    8
+  Priority traders: 5
+  Approved:         0
+  Email-validated:  8
+  Emails sent:      0
+  Bounced:          0
+  Log entries:      0
+========================================
+
+━━━ STEP 7: approve priority traders via web UI ━━━
+(In real use: open http://localhost:8080 → Contacts → click Approve)
+Simulating: approving all priority traders...
+  Approved 5 priority traders:
+    ✓ Gulf Metals Recycling LLC <sales@gulfmetals.com> | tags: ['sealed units', 'electric motor']
+    ✓ Pacific Scrap Traders Inc <info@pacificscrap.com> | tags: ['copper cable', 'aluminum cable']
+    ✓ Great Lakes Metal Co <contact@greatlakesmetal.com> | tags: ['battery scrap']
+    ✓ Northeast Scrap Group <ops@northeastscrap.com> | tags: ['electric motor', 'copper cable']
+    ✓ Rocky Mountain Metal Works <rmmw@rmmetalworks.com> | tags: ['aluminum cable']
+
+━━━ STEP 8: status after approvals ━━━
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    8
+  Priority traders: 5
+  Approved:         5
+  Email-validated:  8
+  Emails sent:      0
+  Bounced:          0
+  Log entries:      0
+========================================
+
+━━━ STEP 9: send --dry-run (preview without sending) ━━━
+DRY RUN — would send to 5 traders:
+  Gulf Metals Recycling LLC <sales@gulfmetals.com>
+  Pacific Scrap Traders Inc <info@pacificscrap.com>
+  Great Lakes Metal Co <contact@greatlakesmetal.com>
+  Northeast Scrap Group <ops@northeastscrap.com>
+  Rocky Mountain Metal Works <rmmw@rmmetalworks.com>
+
+━━━ STEP 10: send --priority-only --dry-run ━━━
+DRY RUN — would send to 5 traders:
+  Gulf Metals Recycling LLC <sales@gulfmetals.com>
+  Pacific Scrap Traders Inc <info@pacificscrap.com>
+  Great Lakes Metal Co <contact@greatlakesmetal.com>
+  Northeast Scrap Group <ops@northeastscrap.com>
+  Rocky Mountain Metal Works <rmmw@rmmetalworks.com>
+
+━━━ STEP 11: send (real attempt — expects graceful fail, no real API key) ━━━
+Sending to 5 traders…
+Done. Sent: 0, Failed: 5
+Errors:
+  sales@gulfmetals.com: SendGrid API key not configured in config.ini
+  info@pacificscrap.com: SendGrid API key not configured in config.ini
+  contact@greatlakesmetal.com: SendGrid API key not configured in config.ini
+  ops@northeastscrap.com: SendGrid API key not configured in config.ini
+  rmmw@rmmetalworks.com: SendGrid API key not configured in config.ini
+
+━━━ STEP 12: status after send attempt ━━━
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    8
+  Priority traders: 5
+  Approved:         5
+  Email-validated:  8
+  Emails sent:      0
+  Bounced:          0
+  Log entries:      0
+========================================
+
+━━━ STEP 13: web dashboard — all routes ━━━
+  GET / (dashboard stats)
+8
+5
+5
+0
+0
+8
+  (numbers = total, priority, approved, sent, bounced, valid)
+
+  GET /contacts (trader table)
+8
+  traders shown in contacts page
+
+  GET /contacts?filter=priority
+  5 priority traders
+
+  GET /send (ready count)
+valid emails ready to send.
+
+  GET /logs (log count)
+0
+  log entries
+
+━━━ STEP 14: final status ━━━
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    8
+  Priority traders: 5
+  Approved:         5
+  Email-validated:  8
+  Emails sent:      0
+  Bounced:          0
+  Log entries:      0
+========================================
+
+======================================================
+  ALL STEPS COMPLETE
+======================================================

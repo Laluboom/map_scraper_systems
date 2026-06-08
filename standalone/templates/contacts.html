@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Contacts ({{ traders|length }})</h1>
+
+<form class="inline" method="get" action="/contacts">
+  <select name="filter">
+    <option value="all" {% if filter=="all" %}selected{% endif %}>All</option>
+    <option value="priority" {% if filter=="priority" %}selected{% endif %}>Priority only</option>
+    <option value="approved" {% if filter=="approved" %}selected{% endif %}>Approved only</option>
+    <option value="pending" {% if filter=="pending" %}selected{% endif %}>Pending send</option>
+  </select>
+  <button class="btn btn-primary" type="submit">Filter</button>
+</form>
+
+{% if traders %}
+<table>
+  <thead>
+    <tr>
+      <th>Company</th><th>Email</th><th>Phone</th><th>City</th><th>Country</th>
+      <th>Source</th><th>Priority</th><th>Valid</th><th>Status</th><th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in traders %}
+    <tr>
+      <td>{{ t.company_name or "—" }}</td>
+      <td>{{ t.email or "—" }}</td>
+      <td>{{ t.phone or "—" }}</td>
+      <td>{{ t.city or "—" }}</td>
+      <td>{{ t.country or "—" }}</td>
+      <td>{{ t.source or "—" }}</td>
+      <td><span class="badge {% if t.priority_flag %}badge-priority{% else %}badge-general{% endif %}">{% if t.priority_flag %}Priority{% else %}General{% endif %}</span></td>
+      <td>{% if t.email_valid is none %}—{% elif t.email_valid %}<span class="badge badge-valid">Valid</span>{% else %}<span class="badge badge-invalid">Invalid</span>{% endif %}</td>
+      <td><span class="badge badge-{{ t.email_status }}">{{ t.email_status }}</span></td>
+      <td>
+        {% if not t.approved %}
+        <a class="btn btn-approve" href="/contacts/{{ t.id }}/approve">Approve</a>
+        {% endif %}
+        <a class="btn btn-reject" href="/contacts/{{ t.id }}/reject">Reject</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No traders found. Run a scrape first.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,131 @@
+============================================================
+  STEP-BY-STEP WALKTHROUGH — POST-FIX RUN
+  Sat Jun  6 10:04:02 PM BST 2026
+============================================================
+
+── STEP 1: setup ──────────────────────────────────────────
+  > supplier_scraper.exe setup
+Created config.ini at /home/lalu/Vellav/Hackathons_n_projects/supplier_gmap_scrape/standalone/config.ini
+Edit it and fill in your API keys, then run 'supplier_scraper.exe serve'
+
+── STEP 2: serve (start dashboard) ────────────────────────
+  > supplier_scraper.exe serve
+  Browser would open http://localhost:8080 — HTTP 200 (OK)
+
+── STEP 3: scrape (selectors still placeholder) ───────────
+  > supplier_scraper.exe scrape --source scrapmonster
+Scraping scrapmonster… (this may take a while)
+Done. No new traders found from scrapmonster.
+  Possible reasons:
+  - Spider selectors are still PLACEHOLDER values (see PLACEHOLDERS.md)
+  - The site blocked the request (try adding a proxy in config.ini)
+  - All found traders were already in the DB (deduplication)
+  DB total after scrape: 0 traders
+
+── STEP 3b: import real data (simulating filled-in selectors)
+  Inserted 5 traders (4 priority, 1 general)
+
+── STEP 4: status after scrape ────────────────────────────
+  > supplier_scraper.exe status
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    5
+  Priority traders: 4
+  Approved:         0
+  Email-validated:  0
+  Emails sent:      0
+  Bounced:          0
+  Log entries:      0
+========================================
+
+── STEP 5: validate emails ────────────────────────────────
+  > supplier_scraper.exe validate
+  (No API keys in config.ini yet — falls back to assume-valid)
+Validating 5 emails…
+Validation complete.
+
+── STEP 6: review contacts in web UI ──────────────────────
+  > browser: http://localhost:8080/contacts
+  Contacts page: 5 traders listed
+  Priority filter: 4 priority traders
+
+── STEP 7: approve priority traders (clicking in UI) ──────
+  > browser: click Approve on each priority trader
+  Approved 4 priority traders:
+    ✓ Gulf Metals Recycling LLC <sales@gulfmetals.com>
+    ✓ Pacific Scrap Traders Inc <info@pacificscrap.com>
+    ✓ Great Lakes Metal Co <contact@greatlakesmetal.com>
+    ✓ Northeast Scrap Group <ops@northeastscrap.com>
+
+── STEP 8: dry run before sending ─────────────────────────
+  > supplier_scraper.exe send --dry-run
+DRY RUN — would send to 4 traders:
+  Gulf Metals Recycling LLC <sales@gulfmetals.com>
+  Pacific Scrap Traders Inc <info@pacificscrap.com>
+  Great Lakes Metal Co <contact@greatlakesmetal.com>
+  Northeast Scrap Group <ops@northeastscrap.com>
+
+── STEP 9: send (placeholder API key — expected to fail per-trader) ─
+  > supplier_scraper.exe send
+Sending to 4 traders…
+Done. Sent: 0, Failed: 4
+Errors:
+  sales@gulfmetals.com: SendGrid API key not configured in config.ini
+  info@pacificscrap.com: SendGrid API key not configured in config.ini
+  contact@greatlakesmetal.com: SendGrid API key not configured in config.ini
+  ops@northeastscrap.com: SendGrid API key not configured in config.ini
+
+── STEP 10: email_status after failed send ─────────────────
+  Expected: traders marked 'bounced' (not stuck as pending)
+  Gulf Metals Recycling LLC: email_status=bounced
+  Pacific Scrap Traders Inc: email_status=bounced
+  Great Lakes Metal Co: email_status=bounced
+  Northeast Scrap Group: email_status=bounced
+
+── STEP 11: run send again — should find 0 pending (no re-send) ──
+  > supplier_scraper.exe send --dry-run
+No approved traders ready to send. Approve contacts in the dashboard first.
+
+── STEP 12: logs page ──────────────────────────────────────
+  > browser: http://localhost:8080/logs
+  Log entries: 4
+
+── STEP 13: dashboard stats ────────────────────────────────
+  > browser: http://localhost:8080/
+  Stats: 5 4 4 0 4 5 
+  (order: total | priority | approved | sent | bounced | valid)
+
+── STEP 14: status summary ─────────────────────────────────
+  > supplier_scraper.exe status
+========================================
+  Supplier Scraper — Database Status
+========================================
+  Total traders:    5
+  Priority traders: 4
+  Approved:         4
+  Email-validated:  5
+  Emails sent:      0
+  Bounced:          4
+  Log entries:      4
+========================================
+
+============================================================
+  ISSUES SUMMARY
+============================================================
+
+FIXED:
+  [✓] email_status now updates to 'bounced'/'sent' after each send
+  [✓] EmailLog written per send attempt (logs page populated)
+  [✓] Scrape reports 0 results with clear explanation
+  [✓] Send --dry-run shows nothing after all bounced (no re-send)
+
+KNOWN REMAINING (need human action):
+  [!] Spider selectors are PLACEHOLDER — scrape returns 0 until filled in
+      → See PLACEHOLDERS.md PH-009 to PH-018
+  [!] Email validation skipped without Hunter.io/ZeroBounce API keys
+      → All emails marked valid by default
+  [!] Emails fail to send without real SendGrid API key
+      → Fill in config.ini PH-002 and PH-003
+  [!] Web UI has no validate button — must run 'supplier_scraper.exe validate' from terminal
+============================================================

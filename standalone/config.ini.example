@@ -1,0 +1,34 @@
+[email]
+# Sign up at sendgrid.com -> Settings -> API Keys -> Create Key
+sendgrid_api_key = PLACEHOLDER_SENDGRID_API_KEY
+# Must be a verified sender in your SendGrid account
+from_email = PLACEHOLDER_VERIFIED_SENDER@yourdomain.com
+from_name = John Doe
+# Emails sent per minute (keep <= 100 to avoid spam flags)
+throttle_per_minute = 30
+
+[validation]
+# Sign up at hunter.io -> Dashboard -> API (optional — skipped if blank)
+hunterio_api_key = PLACEHOLDER_HUNTERIO_API_KEY
+# Sign up at zerobounce.net -> Dashboard -> API (optional fallback)
+zerobounce_api_key = PLACEHOLDER_ZEROBOUNCE_API_KEY
+
+[googleplaces]
+# console.cloud.google.com -> New Project -> Enable "Places API" -> Credentials -> Create API Key
+# The program will prompt you to enter this on first run — you do not need to edit this file manually
+api_key = PLACEHOLDER_GOOGLE_PLACES_API_KEY
+# Re-search a city after this many days (0 = always re-search)
+rescrape_days = 30
+# Search queries run per city (comma-separated)
+search_terms = scrap metal recycling,copper recycling,electric motor scrap,aluminum recycling,battery recycling,scrap yard,non-ferrous metal,industrial scrap
+# Priority score threshold 0-100 — traders at or above this get flagged as priority
+priority_threshold = 40
+
+[proxy]
+# Optional: proxy provider URL e.g. http://user:pass@host:port
+# Leave blank to scrape without proxy
+proxy_url =
+
+[database]
+# Path to the SQLite database file — default: same folder as the exe
+db_path = supplier_scraper.db

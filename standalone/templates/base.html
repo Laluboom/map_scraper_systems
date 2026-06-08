@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supplier Scraper</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, Segoe UI, Arial, sans-serif; background: #f5f6fa; color: #222; }
+    nav { background: #1565c0; color: white; padding: 12px 24px; display: flex; gap: 24px; align-items: center; }
+    nav a { color: white; text-decoration: none; font-weight: 500; }
+    nav a:hover { text-decoration: underline; }
+    nav .brand { font-size: 1.1rem; font-weight: 700; margin-right: auto; }
+    main { padding: 28px; max-width: 1300px; margin: 0 auto; }
+    h1 { margin-bottom: 20px; font-size: 1.4rem; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    th, td { padding: 10px 14px; text-align: left; font-size: 0.85rem; border-bottom: 1px solid #eee; }
+    th { background: #e3eaf7; font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .badge-priority { background: #fff3cd; color: #856404; }
+    .badge-general { background: #e9ecef; color: #555; }
+    .badge-sent { background: #d1e7dd; color: #0a3622; }
+    .badge-pending { background: #e9ecef; color: #555; }
+    .badge-bounced { background: #f8d7da; color: #58151c; }
+    .badge-valid { background: #d1e7dd; color: #0a3622; }
+    .badge-invalid { background: #f8d7da; color: #58151c; }
+    .btn { padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; text-decoration: none; }
+    .btn-approve { background: #198754; color: white; }
+    .btn-reject { background: #dc3545; color: white; }
+    .btn-primary { background: #1565c0; color: white; padding: 8px 18px; font-size: 0.9rem; }
+    .card-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .card { background: white; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); flex: 1; min-width: 160px; }
+    .card .num { font-size: 2rem; font-weight: 700; color: #1565c0; }
+    .card .lbl { font-size: 0.8rem; color: #666; margin-top: 4px; }
+    form.inline { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    input, select { padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; }
+    .msg { padding: 10px 16px; border-radius: 4px; margin-bottom: 16px; }
+    .msg-ok { background: #d1e7dd; color: #0a3622; }
+    .msg-err { background: #f8d7da; color: #58151c; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">Supplier Scraper</span>
+    <a href="/">Dashboard</a>
+    <a href="/contacts">Contacts</a>
+    <a href="/send">Send Emails</a>
+    <a href="/scrape">Scrape</a>
+    <a href="/logs">Logs</a>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
