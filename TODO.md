@@ -23,15 +23,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Phase 1 — Test the standalone app end-to-end
 
-- [ ] **Install dependencies** — `pip install -r requirements_standalone.txt`
-- [ ] **Run setup wizard** — `python cli.py setup` — enter real Google Places API key, SendGrid key, sender email
-- [ ] **Test single-city scrape** — `python cli.py scrape --city "Dallas, TX"` — confirm traders are saved with scores and emails
-- [ ] **Check status** — `python cli.py status` — verify city count, trader count, priority count
-- [ ] **Launch dashboard** — `python cli.py serve` — open http://localhost:8080 and verify all pages load
-- [ ] **Test contacts page** — approve a few traders manually
+- [x] **Install dependencies** — venv at `standalone/.venv`; run with `.venv/bin/python cli.py <cmd>`
+  - Note: `scrapy` and `selenium` removed from install (unused in standalone flow); `sqlalchemy` pinned to `>=2.0.36` for Python 3.14 compatibility
+- [x] **Fresh DB** — old stale DB deleted; `init_db()` recreated schema cleanly; `status` confirmed all-zero
+- [x] **Launch dashboard** — all 5 pages (`/`, `/contacts`, `/scrape`, `/send`, `/logs`) return HTTP 200
+- [ ] **Enable Google billing** — go to console.cloud.google.com/billing, link billing account, then enable **Places API (New)** in the API library. The key `AIzaSyB7iw4-…` is already in `config.ini` and will work immediately after.
+- [ ] **Test single-city scrape** — `python cli.py scrape --city "Dallas, TX"` — confirm traders saved with scores and emails
+- [ ] **Check status** — `python cli.py status` — verify city/trader/priority counts
+- [ ] **Test contacts page** — open http://localhost:8080/contacts, approve a few traders manually
 - [ ] **Test dry-run send** — `python cli.py send --dry-run` — confirm approved traders appear
-- [ ] **Test email send** — `python cli.py send` with real SendGrid key — confirm `email_status` flips to "sent"/"bounced"
-- [ ] **Test resume** — run scrape again with `--resume` — confirm already-done city is skipped
+- [ ] **Add SendGrid key** — run `python cli.py setup` and enter SendGrid API key + verified sender email
+- [ ] **Test email send** — `python cli.py send` — confirm `email_status` flips to "sent"/"bounced"
+- [ ] **Test resume** — run scrape again with `--resume` — confirm already-done cities are skipped
 
 ---
 
@@ -80,6 +83,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - `search_terms.txt` is for reference only — the active terms are read from `config.ini [googleplaces] search_terms`. Edit config.ini to change them.
 - `scraper_runner.py` and legacy Scrapy spiders are still present but unused in the Google Places flow. They can be removed before packaging to reduce `.exe` size.
 - Email status "bounced" is set on any SendGrid API error (including config errors). Check `/logs` for the specific error message if bounces are unexpectedly high.
+- **Python 3.14 compatibility** — `sqlalchemy==2.0.30` (pinned in requirements) crashes on Python 3.14. Installed `>=2.0.36` in the venv. Update `requirements_standalone.txt` before building the `.exe`.
+- **Always run via venv** — use `.venv/bin/python cli.py <cmd>` from `standalone/`. System Python will fail due to missing packages.
+- **config.ini is gitignored** — API keys are safe. Never commit it. Use `config.ini.example` as the template.
 
 ---
 
