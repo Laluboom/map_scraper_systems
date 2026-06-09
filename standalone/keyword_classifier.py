@@ -46,12 +46,14 @@ def score_company(name: str, google_types: list, website_text: str) -> tuple[int
 
     # Layer 2: Google place types
     types_lower = [t.lower() for t in (google_types or [])]
-    if any(t in HIGH_PRIORITY_TYPES for t in types_lower):
+    high_match = next((t for t in types_lower if t in HIGH_PRIORITY_TYPES), None)
+    sec_match  = next((t for t in types_lower if t in SECONDARY_PRIORITY_TYPES), None)
+    if high_match:
         score += 40
-        tags.append("recycling_center")
-    elif any(t in SECONDARY_PRIORITY_TYPES for t in types_lower):
+        tags.append(high_match)
+    elif sec_match:
         score += 20
-        tags.append("industrial_supplier")
+        tags.append(sec_match)
 
     # Layer 3: website text
     text_lower = website_text.lower()

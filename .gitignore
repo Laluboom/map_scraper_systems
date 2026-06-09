@@ -1,6 +1,7 @@
 .env
 standalone/config.ini
 standalone/*.db
+standalone/call_counts.json
 standalone/.venv/
 __pycache__/
 *.py[cod]

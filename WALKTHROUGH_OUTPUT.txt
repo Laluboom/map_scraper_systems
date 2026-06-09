@@ -12,17 +12,16 @@ Edit it and fill in your API keys, then run 'supplier_scraper.exe serve'
   > supplier_scraper.exe serve
   Browser would open http://localhost:8080 — HTTP 200 (OK)
 
-── STEP 3: scrape (selectors still placeholder) ───────────
-  > supplier_scraper.exe scrape --source scrapmonster
-Scraping scrapmonster… (this may take a while)
-Done. No new traders found from scrapmonster.
+── STEP 3: scrape (Google Places API) ─────────────────────
+  > supplier_scraper.exe scrape --city "Dallas, TX"
+Scraping Dallas, TX… (this may take a while)
+Done. No new traders found (billing not yet enabled or city already scraped).
   Possible reasons:
-  - Spider selectors are still PLACEHOLDER values (see PLACEHOLDERS.md)
-  - The site blocked the request (try adding a proxy in config.ini)
-  - All found traders were already in the DB (deduplication)
+  - Google billing not linked (console.cloud.google.com/billing)
+  - All found traders were already in the DB (deduplication by google_place_id)
   DB total after scrape: 0 traders
 
-── STEP 3b: import real data (simulating filled-in selectors)
+── STEP 3b: import real data (simulating successful Places scrape)
   Inserted 5 traders (4 priority, 1 general)
 
 ── STEP 4: status after scrape ────────────────────────────
@@ -119,10 +118,11 @@ FIXED:
   [✓] EmailLog written per send attempt (logs page populated)
   [✓] Scrape reports 0 results with clear explanation
   [✓] Send --dry-run shows nothing after all bounced (no re-send)
+  [✓] Scrapy/spider flow replaced by Google Places API — no CSS selectors needed
 
 KNOWN REMAINING (need human action):
-  [!] Spider selectors are PLACEHOLDER — scrape returns 0 until filled in
-      → See PLACEHOLDERS.md PH-009 to PH-018
+  [!] Google billing must be linked — console.cloud.google.com/billing
+      → Key is set in config.ini; scrape will work immediately after billing is enabled
   [!] Email validation skipped without Hunter.io/ZeroBounce API keys
       → All emails marked valid by default
   [!] Emails fail to send without real SendGrid API key

@@ -38,28 +38,37 @@ def _fetch(url: str) -> str:
 
 def extract_email(website_url: str | None) -> str | None:
     """Return the best email found on the company's website, or None."""
-    if not website_url:
-        return None
+    email, _ = extract_email_and_text(website_url)
+    return email
 
-    # Normalise URL
+
+def extract_email_and_text(website_url: str | None) -> tuple[str | None, str]:
+    """Return (best_email, full_page_text) in a single fetch pass."""
+    if not website_url:
+        return None, ""
+
     if not website_url.startswith("http"):
         website_url = "https://" + website_url
 
-    base = f"{urlparse(website_url).scheme}://{urlparse(website_url).netloc}"
+    parsed = urlparse(website_url)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    all_text = ""
 
     # Try homepage first
     html = _fetch(website_url)
+    all_text = html
     emails = EMAIL_RE.findall(html)
     found = _best_email(emails)
     if found:
-        return found.lower()
+        return found.lower(), all_text
 
     # Try common contact/about subpages
     for path in SUBPAGES:
         html = _fetch(urljoin(base, path))
+        all_text += html
         emails = EMAIL_RE.findall(html)
         found = _best_email(emails)
         if found:
-            return found.lower()
+            return found.lower(), all_text
 
-    return None
+    return None, all_text

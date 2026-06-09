@@ -388,6 +388,7 @@ def status():
     """Show database summary."""
     from db import SessionLocal, init_db
     from models import Trader, EmailLog, ScrapedArea
+    from billing_guard import get_usage_summary
     init_db()
     db = SessionLocal()
     try:
@@ -414,6 +415,7 @@ def status():
     click.echo(f"  Bounced:          {bounced}")
     click.echo(f"  Log entries:      {logs}")
     click.echo("=" * 44)
+    click.echo(get_usage_summary())
 
 
 if __name__ == "__main__":

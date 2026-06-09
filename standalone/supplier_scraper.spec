@@ -14,6 +14,8 @@ a = Analysis(
     datas=[
         (str(HERE / "templates"), "templates"),
         (str(HERE / "config.ini.example"), "."),
+        (str(HERE / "cities_us.txt"), "."),
+        (str(HERE / "search_terms.txt"), "."),
     ],
     hiddenimports=[
         # FastAPI / Starlette internals
@@ -31,22 +33,22 @@ a = Analysis(
         "jinja2",
         # SQLAlchemy
         "sqlalchemy.dialects.sqlite",
-        # Scrapy
-        "scrapy.utils.misc",
-        "scrapy.extensions",
-        "scrapy.pipelines",
-        "twisted",
-        "twisted.internet.asyncioreactor",
-        # email
+        # HTTP + email
         "sendgrid",
         "httpx",
+        "beautifulsoup4",
+        "lxml",
         # local modules
         "db",
         "models",
+        "places_scraper",
+        "keyword_classifier",
+        "website_email_extractor",
+        "area_manager",
+        "billing_guard",
         "email_sender",
         "validator",
         "prioritizer",
-        "scraper_runner",
         "web_server",
     ],
     hookspath=[],
