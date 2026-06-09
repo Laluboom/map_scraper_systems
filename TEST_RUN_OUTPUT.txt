@@ -20,8 +20,8 @@ config.ini already exists at /home/lalu/Vellav/Hackathons_n_projects/supplier_gm
 ========================================
 
 ━━━ STEP 3: simulate scrape output ━━━
-(In real use: supplier_scraper.exe scrape --source scrapmonster)
-Injecting 8 realistic trader records as a spider would produce...
+(In real use: supplier_scraper.exe scrape --city "Dallas, TX")
+Injecting 8 realistic trader records as a Google Places scrape would produce...
   Inserted 8 traders (5 priority, 3 general)
 
 ━━━ STEP 4: status after scrape ━━━

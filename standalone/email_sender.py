@@ -1,13 +1,13 @@
-"""Email sending via SendGrid. Reads config.ini — no .env needed."""
+"""Email sending via SendGrid. Subject from config.ini, body from email_template.txt."""
 import configparser
 import time
 from pathlib import Path
 
-_cfg = configparser.ConfigParser()
-_cfg.read(Path(__file__).parent / "config.ini")
+import sys as _sys
+_BASE = Path(_sys.executable).parent if getattr(_sys, "frozen", False) else Path(__file__).parent
 
-SUBJECT = "Inquiry for Non-Ferrous Scrap Supply"
-BODY_TEMPLATE = """\
+DEFAULT_SUBJECT = "Inquiry for Non-Ferrous Scrap Supply"
+DEFAULT_BODY = """\
 Dear {greeting},
 
 We are an ISO & EPA certified recycle company based in Pakistan.
@@ -40,21 +40,50 @@ Web: www.schion.com.pk
 To unsubscribe, reply with UNSUBSCRIBE in the subject line.
 """
 
+_TEMPLATE_FILE = _BASE / "email_template.txt"
 
-def build_email_body(company_name: str | None) -> str:
+
+def load_template() -> tuple[str, str]:
+    """Return (subject, body_template) from disk, falling back to defaults."""
+    cfg = configparser.ConfigParser()
+    cfg.read(_BASE / "config.ini")
+    subject = cfg.get("email", "subject", fallback=DEFAULT_SUBJECT)
+    body = _TEMPLATE_FILE.read_text(encoding="utf-8") if _TEMPLATE_FILE.exists() else DEFAULT_BODY
+    return subject, body
+
+
+def save_template(subject: str, body: str):
+    """Persist subject to config.ini and body to email_template.txt."""
+    cfg = configparser.ConfigParser()
+    cfg.read(_BASE / "config.ini")
+    if not cfg.has_section("email"):
+        cfg.add_section("email")
+    cfg.set("email", "subject", subject)
+    with open(_BASE / "config.ini", "w") as f:
+        cfg.write(f)
+    _TEMPLATE_FILE.write_text(body, encoding="utf-8")
+
+
+def build_email_body(company_name: str | None, body_template: str) -> str:
     greeting = company_name if company_name else "Sir"
-    return BODY_TEMPLATE.format(greeting=greeting)
+    try:
+        return body_template.format(company_name=company_name or "", greeting=greeting)
+    except KeyError:
+        return body_template  # unknown placeholder — send as-is
 
 
 def send_one(to_email: str, company_name: str | None) -> dict:
-    api_key = _cfg.get("email", "sendgrid_api_key", fallback="")
-    from_email = _cfg.get("email", "from_email", fallback="")
-    from_name = _cfg.get("email", "from_name", fallback="Noaman Alam")
+    cfg = configparser.ConfigParser()
+    cfg.read(_BASE / "config.ini")
+    api_key   = cfg.get("email", "sendgrid_api_key", fallback="")
+    from_email = cfg.get("email", "from_email", fallback="")
+    from_name  = cfg.get("email", "from_name", fallback="Noaman Alam")
 
     if not api_key or "PLACEHOLDER" in api_key:
         return {"success": False, "error": "SendGrid API key not configured in config.ini"}
 
-    body = build_email_body(company_name)
+    subject, body_template = load_template()
+    body = build_email_body(company_name, body_template)
 
     try:
         from sendgrid import SendGridAPIClient
@@ -65,7 +94,7 @@ def send_one(to_email: str, company_name: str | None) -> dict:
     msg = Mail(
         from_email=(from_email, from_name),
         to_emails=to_email,
-        subject=SUBJECT,
+        subject=subject,
         plain_text_content=body,
     )
     try:

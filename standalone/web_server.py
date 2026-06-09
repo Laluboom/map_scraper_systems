@@ -3,9 +3,22 @@ import sys
 import configparser
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote_plus
 import jinja2
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+
+
+def _cfg_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent / "config.ini"
+    return Path(__file__).parent / "config.ini"
+
+
+def _read_cfg() -> configparser.ConfigParser:
+    cfg = configparser.ConfigParser()
+    cfg.read(_cfg_path())
+    return cfg
 
 from db import SessionLocal, init_db
 from models import Trader, EmailLog, ScrapedArea
@@ -16,7 +29,7 @@ if getattr(sys, "frozen", False):
 else:
     _base = Path(__file__).parent
 
-_env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(_base / "templates")), autoescape=True)
+_env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(_base / "templates")), autoescape=True, auto_reload=True)
 
 
 def _render(name: str, **ctx) -> HTMLResponse:
@@ -52,15 +65,17 @@ def contacts(request: Request, filter: str = "all"):
             q = q.filter(Trader.priority_flag == True)
         elif filter == "approved":
             q = q.filter(Trader.approved == True)
+        elif filter == "rejected":
+            q = q.filter(Trader.approved == False)
         elif filter == "pending":
-            q = q.filter(Trader.email_status == "pending")
+            q = q.filter(Trader.approved == True, Trader.email_status == "pending")
         traders = q.order_by(Trader.priority_flag.desc()).limit(500).all()
     finally:
         db.close()
     return _render("contacts.html", traders=traders, filter=filter)
 
 
-@app.get("/contacts/{trader_id}/approve")
+@app.post("/contacts/{trader_id}/approve")
 def approve(trader_id: str):
     db = SessionLocal()
     try:
@@ -73,7 +88,7 @@ def approve(trader_id: str):
     return RedirectResponse("/contacts", status_code=302)
 
 
-@app.get("/contacts/{trader_id}/reject")
+@app.post("/contacts/{trader_id}/reject")
 def reject(trader_id: str):
     db = SessionLocal()
     try:
@@ -86,6 +101,121 @@ def reject(trader_id: str):
     return RedirectResponse("/contacts", status_code=302)
 
 
+@app.post("/contacts/{trader_id}/reset")
+def reset(trader_id: str):
+    db = SessionLocal()
+    try:
+        t = db.query(Trader).filter(Trader.id == trader_id).first()
+        if t:
+            t.approved = None
+            t.email_status = "pending"
+            t.sent_at = None
+            db.commit()
+            db.refresh(t)
+    finally:
+        db.close()
+    return RedirectResponse("/contacts", status_code=302)
+
+
+@app.get("/email-template", response_class=HTMLResponse)
+def email_template_page(request: Request, msg: str = "", error: str = ""):
+    from email_sender import load_template, DEFAULT_BODY, DEFAULT_SUBJECT, build_email_body
+    cfg = _read_cfg()
+    from_email = cfg.get("email", "from_email", fallback="sender@example.com")
+    from_name  = cfg.get("email", "from_name",  fallback="Noaman Alam")
+
+    subject, body = load_template()
+    preview_body = build_email_body("Gulf Metals LLC", body)
+    return _render("email_template.html",
+        subject=subject, body=body, preview_body=preview_body,
+        from_email=from_email, from_name=from_name,
+        msg=msg, error=error)
+
+
+@app.post("/email-template/save")
+async def email_template_save(request: Request):
+    from email_sender import save_template
+    form = await request.form()
+    subject = (form.get("subject") or "").strip()
+    body    = form.get("body") or ""
+    if not subject:
+        return RedirectResponse("/email-template?msg=Subject+cannot+be+empty&error=1", status_code=302)
+    save_template(subject, body)
+    return RedirectResponse("/email-template?msg=Template+saved+successfully", status_code=302)
+
+
+@app.post("/email-template/save-sender")
+async def email_template_save_sender(request: Request):
+    form = await request.form()
+    from_name  = (form.get("from_name")  or "").strip()
+    from_email_val = (form.get("from_email") or "").strip()
+    if not from_name or not from_email_val:
+        return RedirectResponse("/email-template?msg=Name+and+email+are+required&error=1", status_code=302)
+    cfg = _read_cfg()
+    if not cfg.has_section("email"):
+        cfg.add_section("email")
+    cfg.set("email", "from_name",  from_name)
+    cfg.set("email", "from_email", from_email_val)
+    with open(_cfg_path(), "w") as f:
+        cfg.write(f)
+    return RedirectResponse("/email-template?msg=Sender+saved+successfully", status_code=302)
+
+
+@app.post("/email-template/reset")
+def email_template_reset():
+    from email_sender import save_template, DEFAULT_SUBJECT, DEFAULT_BODY
+    save_template(DEFAULT_SUBJECT, DEFAULT_BODY)
+    return RedirectResponse("/email-template?msg=Template+reset+to+default", status_code=302)
+
+
+@app.get("/compose", response_class=HTMLResponse)
+def compose_page(request: Request, msg: str = "", error: str = ""):
+    from email_sender import load_template, DEFAULT_BODY
+    cfg = _read_cfg()
+    from_email_val = cfg.get("email", "from_email", fallback="")
+    from_name  = cfg.get("email", "from_name",  fallback="Noaman Alam")
+    subject, body = load_template()
+    return _render("compose.html",
+        from_email=from_email_val, from_name=from_name,
+        subject=subject, body=body, default_body=DEFAULT_BODY,
+        msg=msg, error=error)
+
+
+@app.post("/compose/send")
+async def compose_send(request: Request):
+    form = await request.form()
+    to_email       = (form.get("to_email")    or "").strip()
+    subject        = (form.get("subject")     or "").strip()
+    body           = (form.get("body")        or "").strip()
+    from_name      = (form.get("from_name")   or "").strip()
+    from_email_val = (form.get("from_email")  or "").strip()
+
+    if not to_email or not subject or not body:
+        return RedirectResponse("/compose?msg=To,+subject+and+body+are+all+required&error=1", status_code=302)
+
+    cfg = _read_cfg()
+    api_key = cfg.get("email", "sendgrid_api_key", fallback="")
+    if not api_key or "PLACEHOLDER" in api_key:
+        return RedirectResponse("/compose?msg=SendGrid+API+key+not+configured.+Run+setup+first.&error=1", status_code=302)
+
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+        msg_obj = Mail(
+            from_email=(from_email_val, from_name),
+            to_emails=to_email,
+            subject=subject,
+            plain_text_content=body,
+        )
+        sg = SendGridAPIClient(api_key)
+        sg.send(msg_obj)
+        return RedirectResponse(f"/compose?msg=Email+sent+to+{quote_plus(to_email)}", status_code=302)
+    except Exception as exc:
+        # Don't put raw exception in URL — may contain API key or sensitive headers
+        print(f"[compose/send] error: {exc}")
+        return RedirectResponse("/compose?msg=Send+failed.+Check+terminal+for+details.&error=1", status_code=302)
+
+
 @app.get("/send", response_class=HTMLResponse)
 def send_page(request: Request, msg: str = "", error: str = ""):
     db = SessionLocal()
@@ -94,6 +224,7 @@ def send_page(request: Request, msg: str = "", error: str = ""):
             Trader.approved == True,
             Trader.email_status == "pending",
             Trader.email != None,
+            Trader.email_valid.isnot(False),
         ).count()
     finally:
         db.close()
@@ -102,48 +233,49 @@ def send_page(request: Request, msg: str = "", error: str = ""):
 
 @app.post("/send/start")
 def send_start():
-    import time, configparser
-    from pathlib import Path
+    import time
+    import threading
     from email_sender import send_one
 
-    cfg = configparser.ConfigParser()
-    cfg.read(Path(__file__).parent / "config.ini")
+    cfg = _read_cfg()
     throttle = cfg.getint("email", "throttle_per_minute", fallback=30)
     delay = 60 / max(throttle, 1)
 
-    db = SessionLocal()
-    try:
-        traders = db.query(Trader).filter(
-            Trader.approved == True,
-            Trader.email_status == "pending",
-            Trader.email != None,
-        ).all()
+    def _run():
+        db = SessionLocal()
+        try:
+            traders = db.query(Trader).filter(
+                Trader.approved == True,
+                Trader.email_status == "pending",
+                Trader.email != None,
+                Trader.email_valid.isnot(False),
+            ).all()
+            for trader in traders:
+                result = send_one(trader.email, trader.company_name)
+                new_status = "sent" if result["success"] else "bounced"
+                trader.email_status = new_status
+                if result["success"]:
+                    trader.sent_at = datetime.utcnow()
+                db.add(EmailLog(
+                    trader_id=trader.id,
+                    status=new_status,
+                    message_id=result.get("message_id"),
+                    error_message=result.get("error"),
+                    created_at=datetime.utcnow(),
+                ))
+                db.commit()
+                time.sleep(delay)
+        finally:
+            db.close()
 
-        sent_count = failed_count = 0
-        for trader in traders:
-            result = send_one(trader.email, trader.company_name)
-            new_status = "sent" if result["success"] else "bounced"
-            trader.email_status = new_status
-            if result["success"]:
-                trader.sent_at = datetime.utcnow()
-                sent_count += 1
-            else:
-                failed_count += 1
-            log = EmailLog(
-                trader_id=trader.id,
-                status=new_status,
-                message_id=result.get("message_id"),
-                error_message=result.get("error"),
-                created_at=datetime.utcnow(),
-            )
-            db.add(log)
-            db.commit()
-            time.sleep(delay)
-
-        msg = f"Done. Sent: {sent_count}, Failed: {failed_count}"
-        return RedirectResponse(f"/send?msg={msg}", status_code=302)
-    finally:
-        db.close()
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout=30)  # wait up to 30s for fast campaigns; otherwise return immediately
+    if t.is_alive():
+        msg = "Campaign started — sending in background. Check Logs page for progress."
+    else:
+        msg = "Campaign complete. Check Logs page for results."
+    return RedirectResponse(f"/send?msg={quote_plus(msg)}", status_code=302)
 
 
 def _scrape_page_ctx(msg="", error=""):
@@ -266,7 +398,11 @@ async def scrape_start(request: Request):
     t.join(timeout=300)
 
     label = city if mode == "city" else ("all US cities (resume)" if use_resume else "all US cities")
-    return RedirectResponse(f"/scrape?msg=Scrape+complete+for+{label.replace(' ', '+')}", status_code=302)
+    if t.is_alive():
+        msg = quote_plus(f"Scrape still running for {label} — check terminal for progress. Refresh this page for updates.")
+    else:
+        msg = quote_plus(f"Scrape complete for {label}")
+    return RedirectResponse(f"/scrape?msg={msg}", status_code=302)
 
 
 @app.get("/logs", response_class=HTMLResponse)

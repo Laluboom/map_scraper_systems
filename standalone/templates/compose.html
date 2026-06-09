@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Compose Email</h1>
+
+{% if msg %}
+<div class="msg {% if error %}msg-err{% else %}msg-ok{% endif %}">{{ msg }}</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;">
+
+  <!-- Compose form -->
+  <div style="background:white;border:1px solid #ddd;border-radius:8px;padding:22px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <form method="post" action="/compose/send" id="composeForm">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">From Name</label>
+          <input name="from_name" value="{{ from_name }}" style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+        </div>
+        <div>
+          <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">From Email</label>
+          <input name="from_email" type="email" value="{{ from_email }}" style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">To <span style="color:#888;">(one email address)</span></label>
+        <input name="to_email" type="email" required placeholder="contact@company.com"
+          style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">Subject</label>
+        <input name="subject" value="{{ subject }}" required
+          style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">Body</label>
+        <textarea name="body" id="bodyField" rows="18" required
+          style="width:100%;padding:10px;border:1px solid #ccc;border-radius:4px;font-size:0.83rem;font-family:monospace;resize:vertical;">{{ body }}</textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary" type="submit"
+          onclick="return confirm('Send this email now?')">Send Email</button>
+        <button class="btn" type="button" style="background:#6c757d;color:white;"
+          onclick="document.getElementById('bodyField').value = {{ default_body|tojson }}">Reset Body</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Live preview -->
+  <div>
+    <div style="font-weight:600;margin-bottom:8px;font-size:0.95rem;">Preview</div>
+    <div id="preview" style="background:white;border:1px solid #ddd;border-radius:6px;padding:16px;font-size:0.85rem;">
+      <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #eee;line-height:1.7;">
+        <span style="color:#888;font-size:0.78rem;">From:</span> <span id="prev-from">{{ from_name }} &lt;{{ from_email }}&gt;</span><br>
+        <span style="color:#888;font-size:0.78rem;">To:</span> <span id="prev-to">—</span><br>
+        <span style="color:#888;font-size:0.78rem;">Subject:</span> <strong id="prev-subject">{{ subject }}</strong>
+      </div>
+      <pre id="prev-body" style="white-space:pre-wrap;font-family:inherit;font-size:0.85rem;margin:0;">{{ body }}</pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Live preview updates
+  const form = document.getElementById('composeForm');
+  function update() {
+    document.getElementById('prev-from').textContent =
+      (form.from_name.value || '—') + ' <' + (form.from_email.value || '—') + '>';
+    document.getElementById('prev-to').textContent = form.to_email.value || '—';
+    document.getElementById('prev-subject').textContent = form.subject.value || '—';
+    document.getElementById('prev-body').textContent = form.body.value || '';
+  }
+  ['from_name','from_email','to_email','subject','body'].forEach(function(n) {
+    form[n].addEventListener('input', update);
+  });
+  update();
+</script>
+{% endblock %}

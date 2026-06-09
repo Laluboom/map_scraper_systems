@@ -21,7 +21,7 @@ class Trader(Base):
     priority_score  = Column(Integer, default=0)          # 0-100 from keyword_classifier
     email_valid     = Column(Boolean, nullable=True)
     email_status    = Column(String(20), default="pending")  # pending/sent/bounced/replied
-    approved        = Column(Boolean, default=False)
+    approved        = Column(Boolean, default=None, nullable=True)
     scraped_at      = Column(DateTime, default=datetime.utcnow)
     sent_at         = Column(DateTime, nullable=True)
     # Google Places fields

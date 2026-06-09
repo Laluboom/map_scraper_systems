@@ -1,15 +1,17 @@
 """Email validation via Hunter.io (primary) and ZeroBounce (fallback)."""
 import configparser
+import sys
 from pathlib import Path
 import httpx
 
-_cfg = configparser.ConfigParser()
-_cfg.read(Path(__file__).parent / "config.ini")
+_BASE = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
 
 
 def validate(email: str) -> bool:
-    hunterio_key = _cfg.get("validation", "hunterio_api_key", fallback="")
-    zerobounce_key = _cfg.get("validation", "zerobounce_api_key", fallback="")
+    cfg = configparser.ConfigParser()
+    cfg.read(_BASE / "config.ini")
+    hunterio_key = cfg.get("validation", "hunterio_api_key", fallback="")
+    zerobounce_key = cfg.get("validation", "zerobounce_api_key", fallback="")
 
     if hunterio_key and "PLACEHOLDER" not in hunterio_key:
         try:

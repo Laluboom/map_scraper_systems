@@ -83,7 +83,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - `search_terms.txt` is for reference only — the active terms are read from `config.ini [googleplaces] search_terms`. Edit config.ini to change them.
 - `scraper_runner.py` and legacy Scrapy spiders are still present but unused in the Google Places flow. They can be removed before packaging to reduce `.exe` size.
 - Email status "bounced" is set on any SendGrid API error (including config errors). Check `/logs` for the specific error message if bounces are unexpectedly high.
-- **Python 3.14 compatibility** — `sqlalchemy==2.0.30` (pinned in requirements) crashes on Python 3.14. Installed `>=2.0.36` in the venv. Update `requirements_standalone.txt` before building the `.exe`.
+- **Python 3.14 compatibility** — `requirements_standalone.txt` pins `sqlalchemy>=2.0.36` (fixed). Earlier versions crash on Python 3.14.
 - **Always run via venv** — use `.venv/bin/python cli.py <cmd>` from `standalone/`. System Python will fail due to missing packages.
 - **config.ini is gitignored** — API keys are safe. Never commit it. Use `config.ini.example` as the template.
 

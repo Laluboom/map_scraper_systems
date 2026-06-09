@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Email Template & Sender Settings</h1>
+
+{% if msg %}
+<div class="msg {% if error %}msg-err{% else %}msg-ok{% endif %}">{{ msg }}</div>
+{% endif %}
+
+<!-- From Settings -->
+<div style="background:white;border:1px solid #ddd;border-radius:8px;padding:20px;margin-bottom:28px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+  <h2 style="font-size:1rem;margin-bottom:14px;">Sender (From)</h2>
+  <form method="post" action="/email-template/save-sender" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+    <div style="flex:1;min-width:200px;">
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">From Name</label>
+      <input name="from_name" value="{{ from_name }}" style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;" placeholder="Noaman Alam">
+    </div>
+    <div style="flex:2;min-width:260px;">
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">From Email <span style="color:#888;">(must be verified in SendGrid)</span></label>
+      <input name="from_email" type="email" value="{{ from_email }}" style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;" placeholder="you@yourdomain.com">
+    </div>
+    <div>
+      <button class="btn btn-primary" type="submit">Save Sender</button>
+    </div>
+  </form>
+</div>
+
+<!-- Template editor + preview -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;">
+
+  <!-- Editor -->
+  <div>
+    <h2 style="font-size:1rem;margin-bottom:14px;">Campaign Template</h2>
+    <form method="post" action="/email-template/save">
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">Subject</label>
+        <input name="subject" value="{{ subject }}" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">Body</label>
+        <textarea name="body" rows="22"
+          style="width:100%;padding:10px;border:1px solid #ccc;border-radius:4px;font-size:0.83rem;font-family:monospace;resize:vertical;">{{ body }}</textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-primary" type="submit">Save Template</button>
+        <form method="post" action="/email-template/reset" style="display:inline;" onsubmit="return confirm('Reset template to default? This cannot be undone.');">
+          <button class="btn" style="background:#6c757d;color:white;" type="submit">Reset to Default</button>
+        </form>
+      </div>
+    </form>
+
+    <div style="margin-top:16px;background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:12px;font-size:0.8rem;color:#555;">
+      <strong>Placeholders</strong> (replaced per recipient when sending):<br><br>
+      <code>{company_name}</code> — company name (e.g. <em>Gulf Metals LLC</em>)<br>
+      <code>{greeting}</code> — company name if known, otherwise <em>Sir</em>
+    </div>
+  </div>
+
+  <!-- Live preview -->
+  <div>
+    <h2 style="font-size:1rem;margin-bottom:14px;">Preview <span style="font-weight:400;color:#888;font-size:0.8rem;">sample: "Gulf Metals LLC"</span></h2>
+    <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:16px;font-size:0.85rem;">
+      <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #eee;line-height:1.7;">
+        <span style="color:#888;font-size:0.78rem;">From:</span> {{ from_name }} &lt;{{ from_email }}&gt;<br>
+        <span style="color:#888;font-size:0.78rem;">To:</span> contact@gulfmetals.com<br>
+        <span style="color:#888;font-size:0.78rem;">Subject:</span> <strong>{{ subject }}</strong>
+      </div>
+      <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.85rem;margin:0;">{{ preview_body }}</pre>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

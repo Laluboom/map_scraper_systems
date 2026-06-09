@@ -19,8 +19,9 @@ import httpx
 from db import SessionLocal
 from models import Trader
 from area_manager import is_done, mark_done
-from website_email_extractor import extract_email
+from website_email_extractor import extract_email, extract_email_and_text
 from keyword_classifier import score_company, is_priority as score_is_priority
+from billing_guard import check_text_search, check_place_details, BillingLimitError
 
 TEXT_SEARCH_URL  = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 DETAILS_URL      = "https://maps.googleapis.com/maps/api/place/details/json"
@@ -30,6 +31,7 @@ DETAILS_FIELDS   = "name,formatted_phone_number,website,formatted_address,url,ty
 # ── API calls ──────────────────────────────────────────────────────────────
 
 def _text_search_page(api_key: str, query: str, page_token: str = "") -> dict:
+    check_text_search()
     params = {"query": query, "key": api_key}
     if page_token:
         params = {"pagetoken": page_token, "key": api_key}
@@ -55,6 +57,7 @@ def search_places(api_key: str, query: str) -> list[dict]:
 
 def get_place_details(api_key: str, place_id: str) -> dict:
     """Fetch phone, website, address for one place_id."""
+    check_place_details()
     r = httpx.get(DETAILS_URL,
                   params={"place_id": place_id, "fields": DETAILS_FIELDS, "key": api_key},
                   timeout=10)
@@ -129,6 +132,9 @@ def run_places_scrape(
                 try:
                     query = f"{term} {city} {state}"
                     raw_places = search_places(api_key, query)
+                except BillingLimitError as exc:
+                    print_fn(f"\n  BILLING LIMIT REACHED: {exc}")
+                    return
                 except Exception as exc:
                     print_fn(f"    API error: {exc}")
                     continue
@@ -145,24 +151,18 @@ def run_places_scrape(
                     try:
                         details = get_place_details(api_key, place_id)
                         time.sleep(0.1)  # gentle rate limit
+                    except BillingLimitError as exc:
+                        print_fn(f"\n  BILLING LIMIT REACHED: {exc}")
+                        mark_done(db, city, state, term, saved)
+                        return
                     except Exception:
                         details = place  # fall back to search result
 
                     details["place_id"] = place_id
 
-                    # Extract email from website
+                    # Extract email + website text in one fetch (avoids double request)
                     website = details.get("website") or place.get("website")
-                    email = extract_email(website)
-
-                    # Score the company
-                    website_text = ""
-                    if website:
-                        try:
-                            import httpx as _hx
-                            resp = _hx.get(website, timeout=6, follow_redirects=True)
-                            website_text = resp.text
-                        except Exception:
-                            pass
+                    email, website_text = extract_email_and_text(website)
 
                     score, tags = score_company(
                         name         = details.get("name", ""),

@@ -4,10 +4,11 @@
 
 <form class="inline" method="get" action="/contacts">
   <select name="filter">
-    <option value="all" {% if filter=="all" %}selected{% endif %}>All</option>
+    <option value="all"      {% if filter=="all"      %}selected{% endif %}>All</option>
     <option value="priority" {% if filter=="priority" %}selected{% endif %}>Priority only</option>
-    <option value="approved" {% if filter=="approved" %}selected{% endif %}>Approved only</option>
-    <option value="pending" {% if filter=="pending" %}selected{% endif %}>Pending send</option>
+    <option value="approved" {% if filter=="approved" %}selected{% endif %}>Approved</option>
+    <option value="rejected" {% if filter=="rejected" %}selected{% endif %}>Rejected</option>
+    <option value="pending"  {% if filter=="pending"  %}selected{% endif %}>Pending send</option>
   </select>
   <button class="btn btn-primary" type="submit">Filter</button>
 </form>
@@ -16,8 +17,8 @@
 <table>
   <thead>
     <tr>
-      <th>Company</th><th>Email</th><th>Phone</th><th>City</th><th>Country</th>
-      <th>Source</th><th>Priority</th><th>Valid</th><th>Status</th><th>Actions</th>
+      <th>Company</th><th>Email</th><th>Phone</th><th>City</th>
+      <th>Priority</th><th>Valid</th><th>Approval</th><th>Email Status</th><th>Actions</th>
     </tr>
   </thead>
   <tbody>
@@ -27,16 +28,59 @@
       <td>{{ t.email or "—" }}</td>
       <td>{{ t.phone or "—" }}</td>
       <td>{{ t.city or "—" }}</td>
-      <td>{{ t.country or "—" }}</td>
-      <td>{{ t.source or "—" }}</td>
-      <td><span class="badge {% if t.priority_flag %}badge-priority{% else %}badge-general{% endif %}">{% if t.priority_flag %}Priority{% else %}General{% endif %}</span></td>
-      <td>{% if t.email_valid is none %}—{% elif t.email_valid %}<span class="badge badge-valid">Valid</span>{% else %}<span class="badge badge-invalid">Invalid</span>{% endif %}</td>
-      <td><span class="badge badge-{{ t.email_status }}">{{ t.email_status }}</span></td>
+
+      {# Priority badge #}
+      <td><span class="badge {% if t.priority_flag %}badge-priority{% else %}badge-general{% endif %}">
+        {% if t.priority_flag %}Priority{% else %}General{% endif %}
+      </span></td>
+
+      {# Email valid badge #}
       <td>
-        {% if not t.approved %}
-        <a class="btn btn-approve" href="/contacts/{{ t.id }}/approve">Approve</a>
+        {% if t.email_valid is none %}—
+        {% elif t.email_valid %}<span class="badge badge-valid">Valid</span>
+        {% else %}<span class="badge badge-invalid">Invalid</span>
         {% endif %}
-        <a class="btn btn-reject" href="/contacts/{{ t.id }}/reject">Reject</a>
+      </td>
+
+      {# Approval status badge #}
+      <td>
+        {% if t.approved == true %}
+          <span class="badge badge-approved">Approved</span>
+        {% elif t.approved == false %}
+          <span class="badge badge-rejected">Rejected</span>
+        {% else %}
+          <span class="badge badge-neutral">—</span>
+        {% endif %}
+      </td>
+
+      {# Email status badge #}
+      <td><span class="badge badge-{{ t.email_status }}">{{ t.email_status }}</span></td>
+
+      {# Actions — logic:
+           Approve : show when not yet approved AND email not sent/bounced
+           Reject  : show when not yet rejected AND email not sent
+           Reset   : show when approved/rejected OR email sent/bounced (something to undo)
+      #}
+      <td style="white-space:nowrap;">
+        <div style="display:flex;gap:6px;">
+          {% if t.approved != true and t.email_status not in ('sent', 'bounced') %}
+          <form method="post" action="/contacts/{{ t.id }}/approve" style="margin:0;">
+            <button class="btn btn-approve" type="submit">Approve</button>
+          </form>
+          {% endif %}
+
+          {% if t.approved != false and t.email_status != 'sent' %}
+          <form method="post" action="/contacts/{{ t.id }}/reject" style="margin:0;">
+            <button class="btn btn-reject" type="submit">Reject</button>
+          </form>
+          {% endif %}
+
+          {% if t.approved is not none or t.email_status in ('sent', 'bounced') %}
+          <form method="post" action="/contacts/{{ t.id }}/reset" style="margin:0;">
+            <button class="btn btn-reset" type="submit" title="Clear to neutral — removes approval/rejection and resets email status to pending">Reset</button>
+          </form>
+          {% endif %}
+        </div>
       </td>
     </tr>
     {% endfor %}
