@@ -1,6 +1,9 @@
-"""Email sending via SendGrid. Subject from config.ini, body from email_template.txt."""
+"""Email sending via SMTP (Gmail, Outlook, or any provider). No external API needed."""
 import configparser
+import smtplib
 import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 
 import sys as _sys
@@ -69,38 +72,40 @@ def build_email_body(company_name: str | None, body_template: str) -> str:
     try:
         return body_template.format(company_name=company_name or "", greeting=greeting)
     except KeyError:
-        return body_template  # unknown placeholder — send as-is
+        return body_template
 
 
 def send_one(to_email: str, company_name: str | None) -> dict:
     cfg = configparser.ConfigParser()
     cfg.read(_BASE / "config.ini")
-    api_key   = cfg.get("email", "sendgrid_api_key", fallback="")
-    from_email = cfg.get("email", "from_email", fallback="")
-    from_name  = cfg.get("email", "from_name", fallback="Noaman Alam")
 
-    if not api_key or "PLACEHOLDER" in api_key:
-        return {"success": False, "error": "SendGrid API key not configured in config.ini"}
+    smtp_host     = cfg.get("email", "smtp_host",     fallback="")
+    smtp_port     = cfg.getint("email", "smtp_port",  fallback=587)
+    smtp_user     = cfg.get("email", "smtp_user",     fallback="")
+    smtp_password = cfg.get("email", "smtp_password", fallback="")
+    from_email    = cfg.get("email", "from_email",    fallback=smtp_user)
+    from_name     = cfg.get("email", "from_name",     fallback="Noaman Alam")
+
+    if not smtp_host or not smtp_user or not smtp_password or "PLACEHOLDER" in smtp_password:
+        return {"success": False, "error": "SMTP credentials not configured in config.ini"}
 
     subject, body_template = load_template()
     body = build_email_body(company_name, body_template)
 
-    try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail
-    except ImportError:
-        return {"success": False, "error": "sendgrid package not installed (pip install sendgrid)"}
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = f"{from_name} <{from_email}>"
+    msg["To"]      = to_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
 
-    msg = Mail(
-        from_email=(from_email, from_name),
-        to_emails=to_email,
-        subject=subject,
-        plain_text_content=body,
-    )
     try:
-        sg = SendGridAPIClient(api_key)
-        resp = sg.send(msg)
-        return {"success": True, "message_id": resp.headers.get("X-Message-Id", "")}
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(from_email, to_email, msg.as_string())
+        return {"success": True, "message_id": ""}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 

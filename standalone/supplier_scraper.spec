@@ -34,7 +34,6 @@ a = Analysis(
         # SQLAlchemy
         "sqlalchemy.dialects.sqlite",
         # HTTP + email
-        "sendgrid",
         "httpx",
         "beautifulsoup4",
         "lxml",
