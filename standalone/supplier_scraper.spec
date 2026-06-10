@@ -52,6 +52,7 @@ a = Analysis(
         "web_server",
         "version",
         "update_checker",
+        "app_logger",
     ],
     hookspath=[],
     runtime_hooks=[],

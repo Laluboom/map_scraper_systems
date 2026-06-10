@@ -2,6 +2,10 @@
 {% block content %}
 <h1>Contacts ({{ traders|length }})</h1>
 
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <a href="/contacts/export.csv" class="btn btn-primary" style="font-size:0.82rem;">Export CSV</a>
+</div>
+
 <form class="inline" method="get" action="/contacts">
   <select name="filter">
     <option value="all"      {% if filter=="all"      %}selected{% endif %}>All</option>

@@ -12,6 +12,8 @@ from_email = your_email@gmail.com
 from_name = John Doe
 # Emails sent per minute (keep <= 20 for Gmail to avoid spam flags)
 throttle_per_minute = 20
+# Maximum emails sent per day (resets at midnight — protects against accidental bulk send)
+daily_send_cap = 200
 
 [validation]
 # Sign up at hunter.io -> Dashboard -> API (optional — skipped if blank)
