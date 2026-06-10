@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Dashboard</h1>
+
+{% if config_warnings %}
+{% for warning in config_warnings %}
+<div class="msg msg-err" style="margin-bottom:8px;">&#9888; {{ warning }}</div>
+{% endfor %}
+{% endif %}
 <div class="card-row">
   <div class="card"><div class="num">{{ stats.total }}</div><div class="lbl">Total Traders</div></div>
   <div class="card"><div class="num">{{ stats.priority }}</div><div class="lbl">Priority Traders</div></div>

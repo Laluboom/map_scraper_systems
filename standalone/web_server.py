@@ -1,13 +1,16 @@
 """FastAPI web UI — replaces React, no Node.js needed."""
+import csv
+import io
 import sys
 import configparser
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from urllib.parse import quote_plus
 import jinja2
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from job_registry import jobs
+from app_logger import log
 
 
 def _cfg_path() -> Path:
@@ -50,6 +53,38 @@ except Exception:
     pass
 
 
+def _config_warnings() -> list[str]:
+    """Return human-readable warnings for missing/placeholder config values."""
+    cfg = _read_cfg()
+    warnings = []
+    gkey = cfg.get("googleplaces", "api_key", fallback="")
+    if not gkey or "PLACEHOLDER" in gkey:
+        warnings.append("Google Places API key not set — scraping will not work. Run setup.")
+    smtp_pw = cfg.get("email", "smtp_password", fallback="")
+    smtp_user = cfg.get("email", "smtp_user", fallback="")
+    if not smtp_user or not smtp_pw or "PLACEHOLDER" in smtp_pw:
+        warnings.append("SMTP credentials not set — email sending will not work. Run setup.")
+    return warnings
+
+
+# Daily send counter — resets automatically when the date changes
+_send_counter: dict = {"date": None, "count": 0}
+
+def _daily_cap() -> int:
+    cfg = _read_cfg()
+    return cfg.getint("email", "daily_send_cap", fallback=200)
+
+def _sent_today() -> int:
+    if _send_counter["date"] != date.today():
+        _send_counter["date"] = date.today()
+        _send_counter["count"] = 0
+    return _send_counter["count"]
+
+def _increment_sent(n: int = 1):
+    _sent_today()  # ensure date is current
+    _send_counter["count"] += n
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
     db = SessionLocal()
@@ -64,7 +99,8 @@ def dashboard(request: Request):
         db.close()
     return _render("dashboard.html",
         stats={"total": total, "priority": priority, "approved": approved,
-               "sent": sent, "bounced": bounced, "valid": valid})
+               "sent": sent, "bounced": bounced, "valid": valid},
+        config_warnings=_config_warnings())
 
 
 @app.get("/contacts", response_class=HTMLResponse)
@@ -267,8 +303,14 @@ def send_start():
         msg = f"Send job already running: {active.label}"
         return RedirectResponse(f"/send?msg={quote_plus(msg)}", status_code=302)
 
+    cap = _daily_cap()
+    sent_so_far = _sent_today()
+    if sent_so_far >= cap:
+        msg = f"Daily send cap reached ({cap} emails/day). Resets at midnight."
+        return RedirectResponse(f"/send?msg={quote_plus(msg)}&error=1", status_code=302)
+
     cfg = _read_cfg()
-    throttle = cfg.getint("email", "throttle_per_minute", fallback=30)
+    throttle = cfg.getint("email", "throttle_per_minute", fallback=20)
     delay = 60 / max(throttle, 1)
 
     def _run(job):
@@ -291,6 +333,12 @@ def send_start():
                     jobs.mark_canceled(job.id, f"Campaign canceled. Sent: {sent_count}, failed: {failed_count}")
                     return
 
+                # Re-check daily cap inside loop
+                if _sent_today() >= _daily_cap():
+                    jobs.mark_canceled(job.id, f"Daily cap reached. Sent: {sent_count} today.")
+                    log.warning(f"Daily send cap hit after {sent_count} emails.")
+                    return
+
                 jobs.update(job.id, f"Sending {index}/{total}: {trader.email}")
                 result = send_one(trader.email, trader.company_name)
                 new_status = "sent" if result["success"] else "bounced"
@@ -298,8 +346,11 @@ def send_start():
                 if result["success"]:
                     trader.sent_at = datetime.utcnow()
                     sent_count += 1
+                    _increment_sent()
+                    log.info(f"Sent to {trader.email} ({trader.company_name})")
                 else:
                     failed_count += 1
+                    log.warning(f"Failed to send to {trader.email}: {result.get('error')}")
                 db.add(EmailLog(
                     trader_id=trader.id,
                     status=new_status,
@@ -310,11 +361,15 @@ def send_start():
                 db.commit()
                 time.sleep(delay)
             jobs.mark_complete(job.id, f"Campaign complete. Sent: {sent_count}, failed: {failed_count}")
+            log.info(f"Campaign complete — sent: {sent_count}, failed: {failed_count}")
+        except Exception as exc:
+            log.error(f"Campaign error: {exc}")
+            jobs.mark_complete(job.id, f"Campaign error — check supplier_scraper.log")
         finally:
             db.close()
 
     job = jobs.start("send", "Email campaign", _run)
-    msg = f"Campaign started. Job ID: {job.id[:8]}"
+    msg = f"Campaign started — sending up to {cap - sent_so_far} emails today (cap: {cap}/day)."
     return RedirectResponse(f"/send?msg={quote_plus(msg)}", status_code=302)
 
 
@@ -477,7 +532,60 @@ def scrape_cancel(job_id: str):
 def logs_page(request: Request):
     db = SessionLocal()
     try:
-        logs = db.query(EmailLog).order_by(EmailLog.created_at.desc()).limit(300).all()
+        logs_data = db.query(EmailLog).order_by(EmailLog.created_at.desc()).limit(300).all()
     finally:
         db.close()
-    return _render("logs.html", logs=logs)
+    return _render("logs.html", logs=logs_data)
+
+
+@app.get("/contacts/export.csv")
+def contacts_export():
+    db = SessionLocal()
+    try:
+        traders = db.query(Trader).order_by(Trader.priority_flag.desc()).all()
+    finally:
+        db.close()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Company", "Email", "Phone", "Website", "City", "State",
+                "Priority", "Email Valid", "Approved", "Email Status", "Sent At", "Tags"])
+    for t in traders:
+        w.writerow([
+            t.company_name or "", t.email or "", t.phone or "",
+            t.website or "", t.city or "", t.state or "",
+            "Yes" if t.priority_flag else "No",
+            "Yes" if t.email_valid else ("No" if t.email_valid is False else ""),
+            "Approved" if t.approved else ("Rejected" if t.approved is False else ""),
+            t.email_status or "",
+            t.sent_at.strftime("%Y-%m-%d %H:%M") if t.sent_at else "",
+            t.tags or "",
+        ])
+    buf.seek(0)
+    filename = f"contacts_{date.today()}.csv"
+    return StreamingResponse(iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@app.get("/logs/export.csv")
+def logs_export():
+    db = SessionLocal()
+    try:
+        logs_data = db.query(EmailLog).order_by(EmailLog.created_at.desc()).all()
+        traders = {t.id: t.company_name for t in db.query(Trader).all()}
+    finally:
+        db.close()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Trader ID", "Company", "Status", "Message ID", "Error", "Sent At"])
+    for l in logs_data:
+        w.writerow([
+            l.trader_id or "", traders.get(l.trader_id, ""),
+            l.status or "", l.message_id or "", l.error_message or "",
+            l.created_at.strftime("%Y-%m-%d %H:%M") if l.created_at else "",
+        ])
+    buf.seek(0)
+    filename = f"email_logs_{date.today()}.csv"
+    return StreamingResponse(iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"})

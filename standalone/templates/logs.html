@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Email Logs ({{ logs|length }})</h1>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <h1 style="margin:0;">Email Logs ({{ logs|length }})</h1>
+  <a href="/logs/export.csv" class="btn btn-primary" style="font-size:0.82rem;">Export CSV</a>
+</div>
 {% if logs %}
 <table>
   <thead>
