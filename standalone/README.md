@@ -53,8 +53,8 @@ Dashboard pages:
 
 - `Dashboard`: Summary counts.
 - `Contacts`: Review, approve, reject, and reset traders.
-- `Scrape`: Start city or all-US scraping and view recent scrape job status.
-- `Send Emails`: Send to approved pending contacts and view recent send job status.
+- `Scrape`: Start city or all-US scraping, view recent scrape job status, and request cancellation.
+- `Send Emails`: Send to approved pending contacts, view recent send job status, and request cancellation.
 - `Compose`: Send a one-off email.
 - `Email Template`: Edit sender and outreach template.
 - `Logs`: Review email send logs.

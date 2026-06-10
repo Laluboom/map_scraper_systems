@@ -1,4 +1,5 @@
 import unittest
+from threading import Event
 
 from job_registry import JobRegistry
 
@@ -47,6 +48,27 @@ class JobRegistryTests(unittest.TestCase):
         self.assertEqual([job.kind for job in registry.recent("scrape")], ["scrape"])
         self.assertEqual([job.kind for job in registry.recent("send")], ["send"])
         self.assertIsNone(registry.active("scrape"))
+
+    def test_cancel_request_and_mark_canceled(self):
+        registry = JobRegistry()
+        started = Event()
+
+        def task(job):
+            started.set()
+            while not registry.is_cancel_requested(job.id):
+                started.wait(0.001)
+            registry.mark_canceled(job.id, "Stopped")
+
+        job = registry.start("scrape", "Long scrape", task)
+        self.assertTrue(started.wait(timeout=2))
+        self.assertTrue(registry.request_cancel(job.id))
+        self.assertTrue(registry.wait(job.id, timeout=2))
+
+        saved = registry.get(job.id)
+        self.assertEqual(saved.status, "canceled")
+        self.assertEqual(saved.message, "Stopped")
+        self.assertTrue(saved.cancel_requested)
+        self.assertFalse(saved.can_cancel)
 
 
 if __name__ == "__main__":

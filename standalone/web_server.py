@@ -287,6 +287,10 @@ def send_start():
 
             sent_count = failed_count = 0
             for index, trader in enumerate(traders, 1):
+                if job.cancel_requested:
+                    jobs.mark_canceled(job.id, f"Campaign canceled. Sent: {sent_count}, failed: {failed_count}")
+                    return
+
                 jobs.update(job.id, f"Sending {index}/{total}: {trader.email}")
                 result = send_one(trader.email, trader.company_name)
                 new_status = "sent" if result["success"] else "bounced"
@@ -311,6 +315,15 @@ def send_start():
 
     job = jobs.start("send", "Email campaign", _run)
     msg = f"Campaign started. Job ID: {job.id[:8]}"
+    return RedirectResponse(f"/send?msg={quote_plus(msg)}", status_code=302)
+
+
+@app.post("/send/{job_id}/cancel")
+def send_cancel(job_id: str):
+    if jobs.request_cancel(job_id, "Cancel requested — stopping after the current email"):
+        msg = "Cancel requested for email campaign."
+    else:
+        msg = "No running email campaign found for that job."
     return RedirectResponse(f"/send?msg={quote_plus(msg)}", status_code=302)
 
 
@@ -439,12 +452,25 @@ async def scrape_start(request: Request):
             rescrape_days=rescrape_days if use_resume else 0,
             priority_threshold=priority_thresh,
             print_fn=_progress,
+            should_cancel=lambda: jobs.is_cancel_requested(job.id),
         )
+        if job.cancel_requested:
+            jobs.mark_canceled(job.id, f"Scrape canceled for {label}")
+            return
         jobs.mark_complete(job.id, f"Scrape complete for {label}")
 
     job = jobs.start("scrape", label, _run)
     msg = quote_plus(f"Scrape started for {label}. Job ID: {job.id[:8]}")
     return RedirectResponse(f"/scrape?msg={msg}", status_code=302)
+
+
+@app.post("/scrape/{job_id}/cancel")
+def scrape_cancel(job_id: str):
+    if jobs.request_cancel(job_id, "Cancel requested — stopping after the current scrape step"):
+        msg = "Cancel requested for scrape job."
+    else:
+        msg = "No running scrape job found for that job."
+    return RedirectResponse(f"/scrape?msg={quote_plus(msg)}", status_code=302)
 
 
 @app.get("/logs", response_class=HTMLResponse)
