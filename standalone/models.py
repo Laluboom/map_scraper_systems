@@ -12,9 +12,12 @@ class Trader(Base):
     company_name    = Column(Text)
     email           = Column(Text, index=True)
     phone           = Column(Text)
+    website         = Column(Text, nullable=True)
     address         = Column(Text)
     city            = Column(Text)
+    state           = Column(Text, nullable=True)
     country         = Column(Text)
+    tags            = Column(Text, nullable=True)
     source          = Column(Text)
     product_tags    = Column(JSON, default=list)
     priority_flag   = Column(Boolean, default=False)
@@ -22,6 +25,7 @@ class Trader(Base):
     email_valid     = Column(Boolean, nullable=True)
     email_status    = Column(String(20), default="pending")  # pending/sent/bounced/replied
     approved        = Column(Boolean, default=None, nullable=True)
+    unsubscribed    = Column(Boolean, default=False, nullable=True)
     scraped_at      = Column(DateTime, default=datetime.utcnow)
     sent_at         = Column(DateTime, nullable=True)
     # Google Places fields

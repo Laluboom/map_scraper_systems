@@ -116,6 +116,8 @@ def contacts(request: Request, filter: str = "all"):
             q = q.filter(Trader.approved == False)
         elif filter == "pending":
             q = q.filter(Trader.approved == True, Trader.email_status == "pending")
+        elif filter == "unsubscribed":
+            q = q.filter(Trader.unsubscribed == True)
         traders = q.order_by(Trader.priority_flag.desc()).limit(500).all()
     finally:
         db.close()
@@ -162,6 +164,113 @@ def reset(trader_id: str):
     finally:
         db.close()
     return RedirectResponse("/contacts", status_code=302)
+
+
+@app.post("/contacts/{trader_id}/unsubscribe")
+def unsubscribe(trader_id: str):
+    db = SessionLocal()
+    try:
+        t = db.query(Trader).filter(Trader.id == trader_id).first()
+        if t:
+            t.unsubscribed = True
+            t.email_status = "bounced"  # stop future sends
+            db.commit()
+            log.info(f"Marked unsubscribed: {t.email} ({t.company_name})")
+    finally:
+        db.close()
+    return RedirectResponse("/contacts", status_code=302)
+
+
+@app.get("/contacts/duplicates", response_class=HTMLResponse)
+def contacts_duplicates(request: Request):
+    from difflib import SequenceMatcher
+    db = SessionLocal()
+    try:
+        traders = db.query(Trader).filter(Trader.unsubscribed.isnot(True)).all()
+    finally:
+        db.close()
+
+    groups = []
+
+    # 1. Exact email duplicates
+    from collections import defaultdict
+    by_email = defaultdict(list)
+    for t in traders:
+        if t.email:
+            by_email[t.email.lower().strip()].append(t)
+    for email, group in by_email.items():
+        if len(group) > 1:
+            groups.append({"reason": f"Same email: {email}", "traders": group})
+
+    # 2. Same phone number
+    by_phone = defaultdict(list)
+    for t in traders:
+        phone = (t.phone or "").strip().replace(" ", "").replace("-", "")
+        if len(phone) >= 7:
+            by_phone[phone].append(t)
+    for phone, group in by_phone.items():
+        if len(group) > 1:
+            ids_already = {t.id for g in groups for t in g["traders"]}
+            if not all(t.id in ids_already for t in group):
+                groups.append({"reason": f"Same phone: {phone}", "traders": group})
+
+    # 3. Similar company names (>= 85% match)
+    checked = set()
+    name_groups = []
+    trader_list = [t for t in traders if t.company_name]
+    for i, a in enumerate(trader_list):
+        if a.id in checked:
+            continue
+        cluster = [a]
+        for b in trader_list[i+1:]:
+            if b.id in checked:
+                continue
+            ratio = SequenceMatcher(None,
+                a.company_name.lower().strip(),
+                b.company_name.lower().strip()).ratio()
+            if ratio >= 0.85:
+                cluster.append(b)
+                checked.add(b.id)
+        if len(cluster) > 1:
+            checked.add(a.id)
+            name_groups.append({"reason": f"Similar name: \"{a.company_name}\"", "traders": cluster})
+    groups.extend(name_groups)
+
+    return _render("duplicates.html", groups=groups)
+
+
+@app.post("/contacts/{trader_id}/delete")
+def delete_trader(trader_id: str):
+    db = SessionLocal()
+    try:
+        t = db.query(Trader).filter(Trader.id == trader_id).first()
+        if t:
+            db.delete(t)
+            db.commit()
+            log.info(f"Deleted trader: {trader_id}")
+    finally:
+        db.close()
+    return RedirectResponse("/contacts/duplicates", status_code=302)
+
+
+@app.get("/backup/download")
+def backup_download():
+    import sqlite3, tempfile, os
+    from db import _db_path
+    # Use SQLite's online backup API — safe even while the DB is in use
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    src = sqlite3.connect(_db_path)
+    dst = sqlite3.connect(tmp.name)
+    src.backup(dst)
+    dst.close()
+    src.close()
+    data = Path(tmp.name).read_bytes()
+    os.unlink(tmp.name)
+    filename = f"supplier_scraper_backup_{date.today()}.db"
+    return StreamingResponse(iter([data]),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 @app.get("/email-template", response_class=HTMLResponse)
@@ -282,6 +391,7 @@ def send_page(request: Request, msg: str = "", error: str = ""):
             Trader.email_status == "pending",
             Trader.email != None,
             Trader.email_valid.isnot(False),
+            Trader.unsubscribed.isnot(True),
         ).count()
     finally:
         db.close()
@@ -321,6 +431,7 @@ def send_start():
                 Trader.email_status == "pending",
                 Trader.email != None,
                 Trader.email_valid.isnot(False),
+                Trader.unsubscribed.isnot(True),
             ).all()
             total = len(traders)
             if not total:
