@@ -2,8 +2,9 @@
 {% block content %}
 <h1>Contacts ({{ traders|length }})</h1>
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
   <a href="/contacts/export.csv" class="btn btn-primary" style="font-size:0.82rem;">Export CSV</a>
+  <a href="/contacts/duplicates" class="btn btn-reset" style="font-size:0.82rem;">Find Duplicates</a>
 </div>
 
 <form class="inline" method="get" action="/contacts">
@@ -12,7 +13,8 @@
     <option value="priority" {% if filter=="priority" %}selected{% endif %}>Priority only</option>
     <option value="approved" {% if filter=="approved" %}selected{% endif %}>Approved</option>
     <option value="rejected" {% if filter=="rejected" %}selected{% endif %}>Rejected</option>
-    <option value="pending"  {% if filter=="pending"  %}selected{% endif %}>Pending send</option>
+    <option value="pending"      {% if filter=="pending"      %}selected{% endif %}>Pending send</option>
+    <option value="unsubscribed" {% if filter=="unsubscribed" %}selected{% endif %}>Unsubscribed</option>
   </select>
   <button class="btn btn-primary" type="submit">Filter</button>
 </form>
@@ -58,7 +60,13 @@
       </td>
 
       {# Email status badge #}
-      <td><span class="badge badge-{{ t.email_status }}">{{ t.email_status }}</span></td>
+      <td>
+        {% if t.unsubscribed %}
+          <span class="badge badge-rejected">Unsubscribed</span>
+        {% else %}
+          <span class="badge badge-{{ t.email_status }}">{{ t.email_status }}</span>
+        {% endif %}
+      </td>
 
       {# Actions — logic:
            Approve : show when not yet approved AND email not sent/bounced
@@ -82,6 +90,14 @@
           {% if t.approved is not none or t.email_status in ('sent', 'bounced') %}
           <form method="post" action="/contacts/{{ t.id }}/reset" style="margin:0;">
             <button class="btn btn-reset" type="submit" title="Clear to neutral — removes approval/rejection and resets email status to pending">Reset</button>
+          </form>
+          {% endif %}
+
+          {% if not t.unsubscribed and t.email_status == 'sent' %}
+          <form method="post" action="/contacts/{{ t.id }}/unsubscribe"
+            onsubmit="return confirm('Mark {{ t.company_name | e }} as unsubscribed? They will be excluded from all future sends.');"
+            style="margin:0;">
+            <button class="btn" style="background:#6f42c1;color:white;" type="submit">Unsub</button>
           </form>
           {% endif %}
         </div>
