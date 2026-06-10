@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*.*.*"
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours — builds latest main, no release created
 
 jobs:
   build:
@@ -27,6 +29,7 @@ jobs:
         run: pyinstaller supplier_scraper.spec --clean --noconfirm
 
       - name: Package release zip
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         working-directory: standalone
         run: |
@@ -38,7 +41,16 @@ jobs:
             -DestinationPath "dist\$zipName"
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
 
-      - name: Create GitHub Release
+      - name: Upload artifact (scheduled / non-tag builds)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: supplier_scraper_latest
+          path: standalone/dist/supplier_scraper.exe
+          retention-days: 7
+
+      - name: Create GitHub Release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: "Supplier Scraper ${{ github.ref_name }}"
