@@ -389,6 +389,8 @@ def status():
     from db import SessionLocal, init_db
     from models import Trader, EmailLog, ScrapedArea
     from billing_guard import get_usage_summary
+    from version import __version__
+    from update_checker import check_for_update
     init_db()
     db = SessionLocal()
     try:
@@ -403,9 +405,15 @@ def status():
     finally:
         db.close()
 
+    update_info = check_for_update(__version__)
+    version_line = f"  Version:          {__version__}"
+    if update_info:
+        version_line += f"  ← new: v{update_info['version']} available — download: {update_info['download_url']}"
+
     click.echo("=" * 44)
     click.echo("  Supplier Scraper — Status")
     click.echo("=" * 44)
+    click.echo(version_line)
     click.echo(f"  Cities searched:  {areas}")
     click.echo(f"  Total traders:    {total}")
     click.echo(f"  Priority traders: {priority}")

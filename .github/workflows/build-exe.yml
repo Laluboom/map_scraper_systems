@@ -1,0 +1,50 @@
+name: Build Windows .exe
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: standalone
+        run: pip install -r requirements_standalone.txt
+
+      - name: Build .exe
+        working-directory: standalone
+        run: pyinstaller supplier_scraper.spec --clean --noconfirm
+
+      - name: Package release zip
+        shell: pwsh
+        working-directory: standalone
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zipName = "supplier_scraper_${tag}.zip"
+          Copy-Item "config.ini.example" "dist\config.ini.example"
+          Copy-Item "..\README.md" "dist\README.md"
+          Compress-Archive -Path "dist\supplier_scraper.exe","dist\config.ini.example","dist\README.md" `
+            -DestinationPath "dist\$zipName"
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Supplier Scraper ${{ github.ref_name }}"
+          body: "Automated build for ${{ github.ref_name }}. Download the zip for a complete first-time package."
+          files: |
+            standalone/dist/supplier_scraper.exe
+            standalone/dist/${{ env.ZIP_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

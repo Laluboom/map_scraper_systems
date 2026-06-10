@@ -58,3 +58,28 @@ python3 -m venv .venv
 ```
 
 See `REFERENCE.md` for full technical details and `TODO.md` for remaining tasks.
+
+---
+
+## Releasing an update (for developer)
+
+```
+1. Edit standalone/version.py — bump __version__ = "1.0.1"
+2. git commit -m "Release v1.0.1"
+3. git tag v1.0.1
+4. git push && git push --tags
+   → GitHub Actions builds supplier_scraper.exe automatically (~5 min)
+5. Download the .exe from the GitHub Release assets
+6. Upload it wherever the client will download from (Google Drive, etc.)
+7. Edit your public Gist (version.json):
+     { "version": "1.0.1", "download_url": "https://...", "notes": "Bug fixes" }
+   → Client's dashboard shows a yellow update banner on next startup
+```
+
+### First-time Gist setup
+
+1. Go to gist.github.com, create a **public** Gist with filename `version.json`
+2. Content: `{ "version": "1.0.0", "download_url": "", "notes": "Initial release" }`
+3. Copy the **Raw** URL (looks like `https://gist.githubusercontent.com/YourUser/abc123/raw/version.json`)
+4. Paste it into `standalone/update_checker.py` as `MANIFEST_URL`
+5. Rebuild and ship — the checker is now live
