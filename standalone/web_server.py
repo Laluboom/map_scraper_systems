@@ -204,24 +204,34 @@ async def compose_send(request: Request):
         return RedirectResponse("/compose?msg=To,+subject+and+body+are+all+required&error=1", status_code=302)
 
     cfg = _read_cfg()
-    api_key = cfg.get("email", "sendgrid_api_key", fallback="")
-    if not api_key or "PLACEHOLDER" in api_key:
-        return RedirectResponse("/compose?msg=SendGrid+API+key+not+configured.+Run+setup+first.&error=1", status_code=302)
+    smtp_password = cfg.get("email", "smtp_password", fallback="")
+    if not smtp_password or "PLACEHOLDER" in smtp_password:
+        return RedirectResponse("/compose?msg=SMTP+credentials+not+configured.+Run+setup+first.&error=1", status_code=302)
 
     try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail
-        msg_obj = Mail(
-            from_email=(from_email_val, from_name),
-            to_emails=to_email,
-            subject=subject,
-            plain_text_content=body,
-        )
-        sg = SendGridAPIClient(api_key)
-        sg.send(msg_obj)
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        smtp_host = cfg.get("email", "smtp_host", fallback="smtp.gmail.com")
+        smtp_port = cfg.getint("email", "smtp_port", fallback=587)
+        smtp_user = cfg.get("email", "smtp_user", fallback="")
+
+        mime = MIMEMultipart("alternative")
+        mime["Subject"] = subject
+        mime["From"]    = f"{from_name} <{from_email_val}>"
+        mime["To"]      = to_email
+        mime.attach(MIMEText(body, "plain", "utf-8"))
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(from_email_val, to_email, mime.as_string())
+
         return RedirectResponse(f"/compose?msg=Email+sent+to+{quote_plus(to_email)}", status_code=302)
     except Exception as exc:
-        # Don't put raw exception in URL — may contain API key or sensitive headers
         print(f"[compose/send] error: {exc}")
         return RedirectResponse("/compose?msg=Send+failed.+Check+terminal+for+details.&error=1", status_code=302)
 

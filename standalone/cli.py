@@ -154,36 +154,51 @@ def setup():
             cfg.set("googleplaces", "api_key", v)
             click.echo("  Saved ✓")
 
-    # SendGrid
-    click.echo("\n── Step 2: SendGrid (required for sending emails) ──")
-    cur = cfg.get("email", "sendgrid_api_key", fallback="")
-    if cur and "PLACEHOLDER" not in cur:
-        click.echo(f"  Already set: {cur[:8]}…")
-    else:
-        v = click.prompt(
-            "  SendGrid API Key\n"
-            "  (sendgrid.com → Settings → API Keys → Create Key)\n"
-            "  Key", default="", show_default=False
-        ).strip()
-        if v:
-            if not cfg.has_section("email"):
-                cfg.add_section("email")
-            cfg.set("email", "sendgrid_api_key", v)
-            click.echo("  Saved ✓")
+    # SMTP credentials
+    click.echo("\n── Step 2: Email / SMTP (required for sending emails) ──")
+    click.echo("  Use your own Gmail or Outlook account — no API needed.")
+    click.echo("  Gmail tip: enable 2FA then create an App Password at myaccount.google.com/apppasswords")
 
-    # Sender email
-    cur = cfg.get("email", "from_email", fallback="")
-    if cur and "PLACEHOLDER" not in cur:
-        click.echo(f"  Sender email already set: {cur}")
+    if not cfg.has_section("email"):
+        cfg.add_section("email")
+
+    cur_host = cfg.get("email", "smtp_host", fallback="")
+    if cur_host and "PLACEHOLDER" not in cur_host:
+        click.echo(f"  SMTP host already set: {cur_host}")
     else:
         v = click.prompt(
-            "  Verified sender email address\n"
-            "  (must be verified in SendGrid → Sender Authentication)\n"
-            "  Email", default="", show_default=False
+            "  SMTP host (Gmail: smtp.gmail.com  |  Outlook: smtp-mail.outlook.com)",
+            default="smtp.gmail.com"
         ).strip()
+        cfg.set("email", "smtp_host", v)
+
+    cur_port = cfg.get("email", "smtp_port", fallback="")
+    if not cur_port:
+        cfg.set("email", "smtp_port", "587")
+
+    cur_user = cfg.get("email", "smtp_user", fallback="")
+    if cur_user and "PLACEHOLDER" not in cur_user:
+        click.echo(f"  SMTP user already set: {cur_user}")
+    else:
+        v = click.prompt("  Your email address", default="", show_default=False).strip()
         if v:
+            cfg.set("email", "smtp_user", v)
             cfg.set("email", "from_email", v)
             click.echo("  Saved ✓")
+
+    cur_pw = cfg.get("email", "smtp_password", fallback="")
+    if cur_pw and "PLACEHOLDER" not in cur_pw:
+        click.echo("  Password already set.")
+    else:
+        v = click.prompt("  Email password or App Password", default="", show_default=False, hide_input=True).strip()
+        if v:
+            cfg.set("email", "smtp_password", v)
+            click.echo("  Saved ✓")
+
+    cur_name = cfg.get("email", "from_name", fallback="")
+    if not cur_name:
+        v = click.prompt("  Sender display name", default="John Doe").strip()
+        cfg.set("email", "from_name", v)
 
     # Hunter.io (optional)
     click.echo("\n── Step 3: Hunter.io — email validation (optional) ──")

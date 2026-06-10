@@ -1,11 +1,17 @@
 [email]
-# Sign up at sendgrid.com -> Settings -> API Keys -> Create Key
-sendgrid_api_key = PLACEHOLDER_SENDGRID_API_KEY
-# Must be a verified sender in your SendGrid account
-from_email = PLACEHOLDER_VERIFIED_SENDER@yourdomain.com
+# SMTP server settings — use your own email account, no API needed
+# Gmail:   smtp_host = smtp.gmail.com   smtp_port = 587
+# Outlook: smtp_host = smtp-mail.outlook.com   smtp_port = 587
+smtp_host = smtp.gmail.com
+smtp_port = 587
+# Your email login credentials
+smtp_user = your_email@gmail.com
+smtp_password = PLACEHOLDER_APP_PASSWORD
+# Display name and address in the From field (can differ from smtp_user)
+from_email = your_email@gmail.com
 from_name = John Doe
-# Emails sent per minute (keep <= 100 to avoid spam flags)
-throttle_per_minute = 30
+# Emails sent per minute (keep <= 20 for Gmail to avoid spam flags)
+throttle_per_minute = 20
 
 [validation]
 # Sign up at hunter.io -> Dashboard -> API (optional — skipped if blank)
