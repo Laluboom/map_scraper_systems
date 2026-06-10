@@ -35,9 +35,10 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $zipName = "supplier_scraper_${tag}.zip"
-          Copy-Item "config.ini.example" "dist\config.ini.example"
+          Copy-Item "config.ini.example" "dist\config.ini"
           Copy-Item "..\README.md" "dist\README.md"
-          Compress-Archive -Path "dist\supplier_scraper.exe","dist\config.ini.example","dist\README.md" `
+          Copy-Item "..\SETUP_GUIDE.pdf" "dist\SETUP_GUIDE.pdf"
+          Compress-Archive -Path "dist\supplier_scraper.exe","dist\config.ini","dist\README.md","dist\SETUP_GUIDE.pdf" `
             -DestinationPath "dist\$zipName"
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
 

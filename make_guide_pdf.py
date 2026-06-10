@@ -101,7 +101,7 @@ pdf.body(
 pdf.section("Step 1 - Extract the zip")
 pdf.body("Right-click the zip file -> Extract All -> extract to a folder you will keep.\nExample:  C:\\SupplierScraper\\")
 pdf.body("After extracting you should see:")
-pdf.code("  supplier_scraper.exe\n  config.ini\n  README.md")
+pdf.code("  supplier_scraper.exe\n  config.ini\n  README.md\n  SETUP_GUIDE.pdf")
 
 # Step 2
 pdf.section("Step 2 - Create a Gmail App Password")
