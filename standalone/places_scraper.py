@@ -109,6 +109,7 @@ def run_places_scrape(
     rescrape_days: int = 30,
     priority_threshold: int = 40,
     print_fn=print,
+    should_cancel=None,
 ):
     """
     Full scrape run.  cities = list of (city, state) tuples.
@@ -121,6 +122,10 @@ def run_places_scrape(
     try:
         for city, state in cities:
             for term in search_terms:
+                if should_cancel and should_cancel():
+                    print_fn("  CANCEL requested — stopping scrape")
+                    return
+
                 area_num += 1
                 label = f"[{area_num}/{total_areas}] {term!r} in {city}, {state}"
 
@@ -141,6 +146,11 @@ def run_places_scrape(
 
                 saved = 0
                 for place in raw_places:
+                    if should_cancel and should_cancel():
+                        print_fn("  CANCEL requested — stopping after current area progress")
+                        mark_done(db, city, state, term, saved)
+                        return
+
                     place_id = place.get("place_id", "")
                     if not place_id:
                         continue

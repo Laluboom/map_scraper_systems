@@ -21,6 +21,7 @@ class Job:
     status: str = "queued"
     message: str = "Queued"
     error: str = ""
+    cancel_requested: bool = False
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_at: datetime = field(default_factory=_now)
@@ -29,6 +30,10 @@ class Job:
     @property
     def is_running(self) -> bool:
         return self.status in {"queued", "running"}
+
+    @property
+    def can_cancel(self) -> bool:
+        return self.is_running and not self.cancel_requested
 
 
 class JobRegistry:
@@ -88,6 +93,20 @@ class JobRegistry:
             if job and job.is_running:
                 job.message = message
 
+    def request_cancel(self, job_id: str, message: str = "Cancel requested") -> bool:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job or not job.is_running:
+                return False
+            job.cancel_requested = True
+            job.message = message
+            return True
+
+    def is_cancel_requested(self, job_id: str) -> bool:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            return bool(job and job.cancel_requested)
+
     def mark_running(self, job_id: str, message: str = "Running") -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -101,6 +120,14 @@ class JobRegistry:
             job = self._jobs.get(job_id)
             if job:
                 job.status = "complete"
+                job.message = message
+                job.finished_at = _now()
+
+    def mark_canceled(self, job_id: str, message: str = "Canceled") -> None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job:
+                job.status = "canceled"
                 job.message = message
                 job.finished_at = _now()
 

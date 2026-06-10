@@ -22,6 +22,11 @@
       {% endif %}
     </div>
     <div class="job-time">
+      {% if job.can_cancel %}
+      <form method="post" action="/scrape/{{ job.id }}/cancel" onsubmit="return confirm('Cancel this scrape after the current API step?');" style="margin-bottom:6px;">
+        <button class="btn btn-cancel" type="submit">Cancel</button>
+      </form>
+      {% endif %}
       {% if job.finished_at %}
       {{ job.finished_at.strftime("%Y-%m-%d %H:%M") }}
       {% elif job.started_at %}
