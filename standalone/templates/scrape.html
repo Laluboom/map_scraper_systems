@@ -6,6 +6,35 @@
 <div class="msg {% if error %}msg-err{% else %}msg-ok{% endif %}">{{ msg }}</div>
 {% endif %}
 
+{% if active_job or recent_jobs %}
+<div class="job-panel">
+  <h2>Scrape Job Status</h2>
+  {% for job in recent_jobs %}
+  <div class="job-line">
+    <div class="job-main">
+      <div>
+        <span class="badge badge-{{ job.status }}">{{ job.status | title }}</span>
+        <span class="job-label">{{ job.label }}</span>
+      </div>
+      <div class="job-message">{{ job.message }}</div>
+      {% if job.error %}
+      <div class="job-message" style="color:#842029;">{{ job.error }}</div>
+      {% endif %}
+    </div>
+    <div class="job-time">
+      {% if job.finished_at %}
+      {{ job.finished_at.strftime("%Y-%m-%d %H:%M") }}
+      {% elif job.started_at %}
+      Started {{ job.started_at.strftime("%H:%M") }}
+      {% else %}
+      Queued
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- Progress summary -->
 <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:16px;margin-bottom:20px;">
   <strong>Area Progress:</strong>

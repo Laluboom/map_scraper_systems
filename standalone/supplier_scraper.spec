@@ -45,6 +45,7 @@ a = Analysis(
         "website_email_extractor",
         "area_manager",
         "billing_guard",
+        "job_registry",
         "email_sender",
         "validator",
         "prioritizer",

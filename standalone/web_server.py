@@ -7,6 +7,7 @@ from urllib.parse import quote_plus
 import jinja2
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from job_registry import jobs
 
 
 def _cfg_path() -> Path:
@@ -248,20 +249,29 @@ def send_page(request: Request, msg: str = "", error: str = ""):
         ).count()
     finally:
         db.close()
-    return _render("send.html", ready=ready, msg=msg, error=error)
+    return _render("send.html",
+        ready=ready,
+        msg=msg,
+        error=error,
+        active_job=jobs.active("send"),
+        recent_jobs=jobs.recent("send", limit=5))
 
 
 @app.post("/send/start")
 def send_start():
     import time
-    import threading
     from email_sender import send_one
+
+    active = jobs.active("send")
+    if active:
+        msg = f"Send job already running: {active.label}"
+        return RedirectResponse(f"/send?msg={quote_plus(msg)}", status_code=302)
 
     cfg = _read_cfg()
     throttle = cfg.getint("email", "throttle_per_minute", fallback=30)
     delay = 60 / max(throttle, 1)
 
-    def _run():
+    def _run(job):
         db = SessionLocal()
         try:
             traders = db.query(Trader).filter(
@@ -270,12 +280,22 @@ def send_start():
                 Trader.email != None,
                 Trader.email_valid.isnot(False),
             ).all()
-            for trader in traders:
+            total = len(traders)
+            if not total:
+                jobs.mark_complete(job.id, "No approved traders ready to send")
+                return
+
+            sent_count = failed_count = 0
+            for index, trader in enumerate(traders, 1):
+                jobs.update(job.id, f"Sending {index}/{total}: {trader.email}")
                 result = send_one(trader.email, trader.company_name)
                 new_status = "sent" if result["success"] else "bounced"
                 trader.email_status = new_status
                 if result["success"]:
                     trader.sent_at = datetime.utcnow()
+                    sent_count += 1
+                else:
+                    failed_count += 1
                 db.add(EmailLog(
                     trader_id=trader.id,
                     status=new_status,
@@ -285,16 +305,12 @@ def send_start():
                 ))
                 db.commit()
                 time.sleep(delay)
+            jobs.mark_complete(job.id, f"Campaign complete. Sent: {sent_count}, failed: {failed_count}")
         finally:
             db.close()
 
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    t.join(timeout=30)  # wait up to 30s for fast campaigns; otherwise return immediately
-    if t.is_alive():
-        msg = "Campaign started — sending in background. Check Logs page for progress."
-    else:
-        msg = "Campaign complete. Check Logs page for results."
+    job = jobs.start("send", "Email campaign", _run)
+    msg = f"Campaign started. Job ID: {job.id[:8]}"
     return RedirectResponse(f"/send?msg={quote_plus(msg)}", status_code=302)
 
 
@@ -339,6 +355,8 @@ def _scrape_page_ctx(msg="", error=""):
         pct=pct,
         rescrape_days=rescrape_days,
         recent_areas=recent_areas,
+        active_job=jobs.active("scrape"),
+        recent_jobs=jobs.recent("scrape", limit=5),
     )
 
 
@@ -349,10 +367,14 @@ def scrape_page(request: Request, msg: str = "", error: str = ""):
 
 @app.post("/scrape/start")
 async def scrape_start(request: Request):
-    import threading
     form = await request.form()
     mode = form.get("mode", "city")
     city = (form.get("city") or "").strip()
+
+    active = jobs.active("scrape")
+    if active:
+        msg = f"Scrape job already running: {active.label}"
+        return RedirectResponse(f"/scrape?msg={quote_plus(msg)}", status_code=302)
 
     if getattr(sys, "frozen", False):
         _cfg_path = Path(sys.executable).parent / "config.ini"
@@ -402,26 +424,26 @@ async def scrape_start(request: Request):
     from places_scraper import run_places_scrape
     from db import init_db
 
-    def _run():
+    label = city if mode == "city" else ("all US cities (resume)" if use_resume else "all US cities")
+
+    def _run(job):
         init_db()
+        def _progress(message: str):
+            print(message)
+            jobs.update(job.id, message.strip())
+
         run_places_scrape(
             api_key=api_key,
             cities=cities,
             search_terms=search_terms,
             rescrape_days=rescrape_days if use_resume else 0,
             priority_threshold=priority_thresh,
-            print_fn=print,
+            print_fn=_progress,
         )
+        jobs.mark_complete(job.id, f"Scrape complete for {label}")
 
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    t.join(timeout=300)
-
-    label = city if mode == "city" else ("all US cities (resume)" if use_resume else "all US cities")
-    if t.is_alive():
-        msg = quote_plus(f"Scrape still running for {label} — check terminal for progress. Refresh this page for updates.")
-    else:
-        msg = quote_plus(f"Scrape complete for {label}")
+    job = jobs.start("scrape", label, _run)
+    msg = quote_plus(f"Scrape started for {label}. Job ID: {job.id[:8]}")
     return RedirectResponse(f"/scrape?msg={msg}", status_code=302)
 
 

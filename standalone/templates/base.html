@@ -42,6 +42,18 @@
     .msg { padding: 10px 16px; border-radius: 4px; margin-bottom: 16px; }
     .msg-ok { background: #d1e7dd; color: #0a3622; }
     .msg-err { background: #f8d7da; color: #58151c; }
+    .job-panel { background:white;border:1px solid #d9e2ef;border-radius:8px;padding:14px 16px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.05); }
+    .job-panel h2 { font-size:1rem;margin-bottom:10px; }
+    .job-line { display:flex;gap:10px;align-items:center;justify-content:space-between;border-top:1px solid #eef2f6;padding:9px 0;font-size:.85rem; }
+    .job-line:first-of-type { border-top:none; }
+    .job-main { min-width:0; }
+    .job-label { font-weight:600; }
+    .job-message { color:#555;margin-top:3px;overflow-wrap:anywhere; }
+    .job-time { color:#777;font-size:.78rem;white-space:nowrap; }
+    .badge-running { background:#cff4fc;color:#055160; }
+    .badge-complete { background:#d1e7dd;color:#0a3622; }
+    .badge-failed { background:#f8d7da;color:#58151c; }
+    .badge-queued { background:#e9ecef;color:#555; }
   </style>
 </head>
 <body>
@@ -69,5 +81,8 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  {% if active_job %}
+  <script>setTimeout(function(){ window.location.reload(); }, 10000);</script>
+  {% endif %}
 </body>
 </html>
