@@ -55,6 +55,17 @@
     <a href="/scrape">Scrape</a>
     <a href="/logs">Logs</a>
   </nav>
+  {% if update_info %}
+  <div id="update-banner" style="background:#fff3cd;color:#856404;padding:10px 24px;display:flex;align-items:center;gap:12px;font-size:0.88rem;">
+    <span>&#x2B06; Update available: <strong>v{{ update_info.version }}</strong>{% if update_info.notes %} — {{ update_info.notes }}{% endif %}</span>
+    {% if update_info.download_url %}
+    <a href="{{ update_info.download_url }}" target="_blank" style="color:#856404;font-weight:600;text-decoration:underline;">Download</a>
+    {% endif %}
+    <button onclick="document.getElementById('update-banner').style.display='none';sessionStorage.setItem('banner_dismissed','1');"
+      style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:#856404;">&#x2715;</button>
+  </div>
+  <script>if(sessionStorage.getItem('banner_dismissed')==='1'){var b=document.getElementById('update-banner');if(b)b.style.display='none';}</script>
+  {% endif %}
   <main>
     {% block content %}{% endblock %}
   </main>

@@ -50,6 +50,8 @@ a = Analysis(
         "validator",
         "prioritizer",
         "web_server",
+        "version",
+        "update_checker",
     ],
     hookspath=[],
     runtime_hooks=[],

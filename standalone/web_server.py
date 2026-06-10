@@ -33,10 +33,20 @@ _env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(_base / "templates"
 
 
 def _render(name: str, **ctx) -> HTMLResponse:
+    ctx.setdefault("update_info", _update_info)
     return HTMLResponse(_env.get_template(name).render(**ctx))
 
 app = FastAPI()
 init_db()
+
+# Check for updates once at startup; cached for the lifetime of the process
+_update_info: dict | None = None
+try:
+    from version import __version__ as _current_version
+    from update_checker import check_for_update as _check_for_update
+    _update_info = _check_for_update(_current_version)
+except Exception:
+    pass
 
 
 @app.get("/", response_class=HTMLResponse)
