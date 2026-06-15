@@ -35,8 +35,6 @@ a = Analysis(
         "sqlalchemy.dialects.sqlite",
         # HTTP + email
         "httpx",
-        "beautifulsoup4",
-        "lxml",
         # local modules
         "db",
         "models",

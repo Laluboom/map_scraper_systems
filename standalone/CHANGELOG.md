@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-15
+
+### Added
+
+- Added `/settings` page to the web dashboard for changing email credentials (From Name, From Email, SMTP host/port/user/password) without touching config.ini manually.
+- Added **Settings** link to the top navigation bar.
+- Password field on settings page only updates if a new value is entered — leaving it blank keeps the existing password.
+
+### Fixed
+
+- Fixed `state` never being saved to the database during scraping — the state from each `(city, state)` tuple was used in the search query but dropped before saving the trader record.
+- Fixed `website` never being saved to the database during scraping — the website URL was fetched for email extraction but not persisted on the trader record.
+- Fixed CSV contact export always showing blank Tags column — was reading `t.tags` (an unused text field) instead of `t.product_tags` (the actual JSON list populated by the scraper).
+- Fixed silent startup crash: `init_db()` was called at module level in `web_server.py` with no error handling, causing the exe to flash and close with no visible error if the database was locked or corrupt. Now prints the error to the terminal before continuing.
+- Fixed wrong PyInstaller hidden import: `"beautifulsoup4"` is not a valid Python import name (correct name is `bs4`); removed it and `lxml` since neither is used in the standalone codebase.
+- Fixed double-click behavior: running `supplier_scraper.exe` with no arguments now defaults to `serve` instead of printing help and exiting immediately.
+
+### Changed
+
+- Updated `_save_trader()` signature in `places_scraper.py` to accept `state` parameter.
+- Removed unused `lxml` and `beautifulsoup4` hidden imports from `supplier_scraper.spec`.
+
 ## 2026-06-10
 
 ### Added

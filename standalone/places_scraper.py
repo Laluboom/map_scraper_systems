@@ -68,7 +68,8 @@ def get_place_details(api_key: str, place_id: str) -> dict:
 # ── DB save ────────────────────────────────────────────────────────────────
 
 def _save_trader(db, details: dict, email: str | None, score: int,
-                 tags: list, priority: bool, city: str, country: str = "US"):
+                 tags: list, priority: bool, city: str, state: str = "",
+                 country: str = "US"):
     place_id = details.get("place_id", "")
 
     # Skip if place_id already in DB
@@ -83,8 +84,10 @@ def _save_trader(db, details: dict, email: str | None, score: int,
         company_name   = details.get("name"),
         email          = email.lower() if email else None,
         phone          = details.get("formatted_phone_number"),
+        website        = details.get("website"),
         address        = details.get("formatted_address"),
         city           = city,
+        state          = state,
         country        = country,
         source         = "GooglePlaces",
         product_tags   = tags,
@@ -181,7 +184,7 @@ def run_places_scrape(
                     )
                     priority = score_is_priority(score, priority_threshold)
 
-                    if _save_trader(db, details, email, score, tags, priority, city):
+                    if _save_trader(db, details, email, score, tags, priority, city, state):
                         saved += 1
 
                 mark_done(db, city, state, term, saved)

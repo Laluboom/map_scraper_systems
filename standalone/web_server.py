@@ -41,7 +41,12 @@ def _render(name: str, **ctx) -> HTMLResponse:
     return HTMLResponse(_env.get_template(name).render(**ctx))
 
 app = FastAPI()
-init_db()
+try:
+    init_db()
+except Exception as _db_err:
+    import traceback
+    print(f"[STARTUP ERROR] Database initialisation failed: {_db_err}")
+    traceback.print_exc()
 
 # Check for updates once at startup; cached for the lifetime of the process
 _update_info: dict | None = None
@@ -669,13 +674,45 @@ def contacts_export():
             "Approved" if t.approved else ("Rejected" if t.approved is False else ""),
             t.email_status or "",
             t.sent_at.strftime("%Y-%m-%d %H:%M") if t.sent_at else "",
-            t.tags or "",
+            ", ".join(t.product_tags) if t.product_tags else (t.tags or ""),
         ])
     buf.seek(0)
     filename = f"contacts_{date.today()}.csv"
     return StreamingResponse(iter([buf.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, msg: str = "", error: str = ""):
+    cfg = _read_cfg()
+    return _render("settings.html",
+        from_name=cfg.get("email", "from_name", fallback=""),
+        from_email=cfg.get("email", "from_email", fallback=""),
+        smtp_host=cfg.get("email", "smtp_host", fallback="smtp.gmail.com"),
+        smtp_port=cfg.get("email", "smtp_port", fallback="587"),
+        smtp_user=cfg.get("email", "smtp_user", fallback=""),
+        smtp_password=cfg.get("email", "smtp_password", fallback=""),
+        msg=msg, error=error)
+
+
+@app.post("/settings/save")
+async def settings_save(request: Request):
+    form = await request.form()
+    cfg = _read_cfg()
+    if not cfg.has_section("email"):
+        cfg.add_section("email")
+    cfg.set("email", "from_name",  (form.get("from_name")  or "").strip())
+    cfg.set("email", "from_email", (form.get("from_email") or "").strip())
+    cfg.set("email", "smtp_host",  (form.get("smtp_host")  or "smtp.gmail.com").strip())
+    cfg.set("email", "smtp_port",  (form.get("smtp_port")  or "587").strip())
+    cfg.set("email", "smtp_user",  (form.get("smtp_user")  or "").strip())
+    password = (form.get("smtp_password") or "").strip()
+    if password:
+        cfg.set("email", "smtp_password", password)
+    with open(_cfg_path(), "w") as f:
+        cfg.write(f)
+    return RedirectResponse("/settings?msg=Settings+saved+successfully", status_code=302)
 
 
 @app.get("/logs/export.csv")

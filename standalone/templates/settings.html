@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Email & SMTP Settings</h1>
+
+{% if msg %}
+<div class="msg {% if error %}msg-err{% else %}msg-ok{% endif %}">{{ msg }}</div>
+{% endif %}
+
+<form method="post" action="/settings/save" style="max-width:560px;">
+  <div style="background:white;border:1px solid #ddd;border-radius:8px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:16px;">
+
+    <div>
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">From Name</label>
+      <input name="from_name" value="{{ from_name }}" placeholder="John Doe" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+    </div>
+
+    <div>
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">From Email</label>
+      <input name="from_email" type="email" value="{{ from_email }}" placeholder="you@example.com" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+    </div>
+
+    <hr style="border:none;border-top:1px solid #eee;">
+
+    <div>
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">SMTP Host</label>
+      <input name="smtp_host" value="{{ smtp_host }}" placeholder="smtp.gmail.com" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+    </div>
+
+    <div>
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">SMTP Port</label>
+      <input name="smtp_port" type="number" value="{{ smtp_port }}" placeholder="587" style="width:120px;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+    </div>
+
+    <div>
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">SMTP Username (email)</label>
+      <input name="smtp_user" value="{{ smtp_user }}" placeholder="you@gmail.com" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+    </div>
+
+    <div>
+      <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">SMTP Password / App Password</label>
+      <input name="smtp_password" type="password" value="{{ smtp_password }}" placeholder="leave blank to keep current" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;">
+      <div style="font-size:0.78rem;color:#888;margin-top:4px;">For Gmail: use an App Password (not your login password). <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#1565c0;">Get one here</a>.</div>
+    </div>
+
+    <div>
+      <button class="btn btn-primary" type="submit">Save Settings</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

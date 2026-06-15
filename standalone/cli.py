@@ -442,4 +442,7 @@ def status():
 
 
 if __name__ == "__main__":
+    # Double-click on Windows passes no args — default to `serve`
+    if len(sys.argv) == 1:
+        sys.argv.append("serve")
     cli()
