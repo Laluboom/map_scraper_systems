@@ -14,7 +14,6 @@ Usage:
 import sys
 import webbrowser
 import threading
-import shutil
 import configparser
 from pathlib import Path
 
@@ -43,15 +42,10 @@ def _save_cfg(cfg: configparser.ConfigParser):
 
 
 def _ensure_config():
-    """Create config.ini from example if missing, then exit so user can fill it in."""
+    """Warn and exit if config.ini is missing — user should run serve and use the setup page."""
     if not CONFIG_PATH.exists():
-        example = BASE_DIR / "config.ini.example"
-        if example.exists():
-            shutil.copy(example, CONFIG_PATH)
-            click.echo(f"Created config.ini at {CONFIG_PATH}")
-            click.echo("Run 'supplier_scraper.exe setup' to enter your API keys interactively.")
-        else:
-            click.echo("config.ini not found. Run 'supplier_scraper.exe setup' first.")
+        click.echo("config.ini not found.")
+        click.echo("Run supplier_scraper.exe (or python cli.py serve) and complete the setup page in the browser.")
         sys.exit(1)
 
 
@@ -120,16 +114,7 @@ def cli():
 @cli.command()
 def setup():
     """Interactive first-time setup wizard. Sets all API keys in config.ini."""
-    example = BASE_DIR / "config.ini.example"
-    if not CONFIG_PATH.exists():
-        if example.exists():
-            shutil.copy(example, CONFIG_PATH)
-            click.echo(f"Created config.ini at {CONFIG_PATH}")
-        else:
-            click.echo("config.ini.example not found.")
-            sys.exit(1)
-
-    cfg = _load_cfg()
+    cfg = _load_cfg()  # starts empty if config.ini doesn't exist yet
 
     click.echo("\n" + "=" * 52)
     click.echo("  Supplier Scraper — Setup Wizard")
@@ -229,7 +214,6 @@ def setup():
 @click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
 def serve(port, no_browser):
     """Start the web dashboard at http://localhost:<port>"""
-    _ensure_config()
     import uvicorn
     from web_server import app
 

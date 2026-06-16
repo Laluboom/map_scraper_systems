@@ -13,7 +13,6 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(HERE / "templates"), "templates"),
-        (str(HERE / "config.ini.example"), "."),
         (str(HERE / "cities_us.txt"), "."),
         (str(HERE / "search_terms.txt"), "."),
     ],

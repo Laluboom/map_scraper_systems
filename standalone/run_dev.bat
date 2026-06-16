@@ -39,16 +39,7 @@ REM ── Install dependencies ────────────────
 echo Installing dependencies...
 python -m pip install -r requirements_standalone.txt -q
 
-REM ── First-time config ──────────────────────────────────────────────────────
-if not exist config.ini (
-    copy config.ini.example config.ini >nul
-    echo.
-    echo  Created config.ini -- fill in your API keys, then re-run this script.
-    notepad config.ini
-    pause
-    exit /b 0
-)
-
 REM ── Launch ─────────────────────────────────────────────────────────────────
+REM config.ini is created automatically via the browser setup page on first run
 python cli.py serve
 pause
