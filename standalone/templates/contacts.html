@@ -9,11 +9,10 @@
 
 <form class="inline" method="get" action="/contacts">
   <select name="filter">
-    <option value="all"      {% if filter=="all"      %}selected{% endif %}>All</option>
-    <option value="priority" {% if filter=="priority" %}selected{% endif %}>Priority only</option>
-    <option value="approved" {% if filter=="approved" %}selected{% endif %}>Approved</option>
-    <option value="rejected" {% if filter=="rejected" %}selected{% endif %}>Rejected</option>
-    <option value="pending"      {% if filter=="pending"      %}selected{% endif %}>Pending send</option>
+    <option value="all"          {% if filter=="all"          %}selected{% endif %}>All</option>
+    <option value="priority"     {% if filter=="priority"     %}selected{% endif %}>Priority only</option>
+    <option value="pending"      {% if filter=="pending"      %}selected{% endif %}>Ready to send</option>
+    <option value="rejected"     {% if filter=="rejected"     %}selected{% endif %}>Rejected</option>
     <option value="unsubscribed" {% if filter=="unsubscribed" %}selected{% endif %}>Unsubscribed</option>
   </select>
   <button class="btn btn-primary" type="submit">Filter</button>
@@ -23,8 +22,8 @@
 <table>
   <thead>
     <tr>
-      <th>Company</th><th>Email</th><th>Phone</th><th>City</th>
-      <th>Priority</th><th>Valid</th><th>Approval</th><th>Email Status</th><th>Actions</th>
+      <th>Company</th><th>Email</th><th>Phone</th><th>City</th><th>State</th>
+      <th>Priority</th><th>Valid</th><th>Status</th><th>Email Status</th><th>Actions</th>
     </tr>
   </thead>
   <tbody>
@@ -34,6 +33,7 @@
       <td>{{ t.email or "—" }}</td>
       <td>{{ t.phone or "—" }}</td>
       <td>{{ t.city or "—" }}</td>
+      <td>{{ t.state or "—" }}</td>
 
       {# Priority badge #}
       <td><span class="badge {% if t.priority_flag %}badge-priority{% else %}badge-general{% endif %}">
@@ -48,14 +48,12 @@
         {% endif %}
       </td>
 
-      {# Approval status badge #}
+      {# Send status badge — rejected = excluded, everything else will be sent #}
       <td>
-        {% if t.approved == true %}
-          <span class="badge badge-approved">Approved</span>
-        {% elif t.approved == false %}
+        {% if t.approved == false %}
           <span class="badge badge-rejected">Rejected</span>
         {% else %}
-          <span class="badge badge-neutral">—</span>
+          <span class="badge badge-approved">Will Send</span>
         {% endif %}
       </td>
 
@@ -68,28 +66,22 @@
         {% endif %}
       </td>
 
-      {# Actions — logic:
-           Approve : show when not yet approved AND email not sent/bounced
-           Reject  : show when not yet rejected AND email not sent
-           Reset   : show when approved/rejected OR email sent/bounced (something to undo)
+      {# Actions:
+           Reject : shown when not already rejected and email not yet sent
+           Reset  : shown when rejected, to undo the rejection
+           Unsub  : shown after a successful send
       #}
       <td style="white-space:nowrap;">
         <div style="display:flex;gap:6px;">
-          {% if t.approved != true and t.email_status not in ('sent', 'bounced') %}
-          <form method="post" action="/contacts/{{ t.id }}/approve" style="margin:0;">
-            <button class="btn btn-approve" type="submit">Approve</button>
-          </form>
-          {% endif %}
-
-          {% if t.approved != false and t.email_status != 'sent' %}
+          {% if t.approved != false and t.email_status not in ('sent', 'bounced') %}
           <form method="post" action="/contacts/{{ t.id }}/reject" style="margin:0;">
             <button class="btn btn-reject" type="submit">Reject</button>
           </form>
           {% endif %}
 
-          {% if t.approved is not none or t.email_status in ('sent', 'bounced') %}
+          {% if t.approved == false %}
           <form method="post" action="/contacts/{{ t.id }}/reset" style="margin:0;">
-            <button class="btn btn-reset" type="submit" title="Clear to neutral — removes approval/rejection and resets email status to pending">Reset</button>
+            <button class="btn btn-reset" type="submit">Un-reject</button>
           </form>
           {% endif %}
 

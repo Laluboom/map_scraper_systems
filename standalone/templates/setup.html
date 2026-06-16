@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup — Supplier Scraper</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, Segoe UI, Arial, sans-serif; background: #f5f6fa; color: #222; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: white; border-radius: 10px; padding: 36px 40px; box-shadow: 0 2px 12px rgba(0,0,0,.1); width: 100%; max-width: 520px; }
+    h1 { font-size: 1.4rem; margin-bottom: 6px; }
+    .subtitle { color: #666; font-size: 0.88rem; margin-bottom: 24px; }
+    .section { margin-bottom: 20px; }
+    .section-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #1565c0; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #e3eaf7; }
+    label { display: block; font-size: 0.82rem; color: #555; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.88rem; margin-bottom: 12px; }
+    .hint { font-size: 0.76rem; color: #888; margin-top: -8px; margin-bottom: 12px; }
+    .hint a { color: #1565c0; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    .msg { padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 0.88rem; }
+    .msg-err { background: #f8d7da; color: #58151c; }
+    .btn { width: 100%; padding: 10px; background: #1565c0; color: white; border: none; border-radius: 4px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .btn:hover { background: #1254a1; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Welcome to Supplier Scraper</h1>
+  <p class="subtitle">Enter your credentials once to get started. You can change these later in Settings.</p>
+
+  {% if msg %}
+  <div class="msg msg-err">{{ msg }}</div>
+  {% endif %}
+
+  <form method="post" action="/setup/save">
+
+    <div class="section">
+      <div class="section-title">Google Places API</div>
+      <label>API Key <span style="color:#c00;">*</span></label>
+      <input name="google_api_key" value="{{ google_api_key if google_api_key and 'PLACEHOLDER' not in google_api_key else '' }}" placeholder="AIza..." autocomplete="off">
+      <p class="hint">Get one at <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a> → Enable "Places API" → Credentials → Create API Key</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Email / SMTP</div>
+      <label>Your Email Address <span style="color:#c00;">*</span></label>
+      <input name="smtp_user" type="email" value="{{ smtp_user }}" placeholder="you@gmail.com">
+
+      <label>App Password <span style="color:#c00;">*</span></label>
+      <input name="smtp_password" type="password" placeholder="Gmail App Password (not your login password)">
+      <p class="hint">For Gmail: enable 2FA then create an App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a></p>
+
+      <label>Your Name (shown in From field)</label>
+      <input name="from_name" value="{{ from_name }}" placeholder="John Doe">
+
+      <div style="display:none;">
+        <input name="smtp_host" value="{{ smtp_host or 'smtp.gmail.com' }}">
+        <input name="smtp_port" value="{{ smtp_port or '587' }}">
+        <input name="from_email" value="{{ from_email }}">
+      </div>
+    </div>
+
+    <button class="btn" type="submit">Save &amp; Open Dashboard</button>
+  </form>
+</div>
+</body>
+</html>

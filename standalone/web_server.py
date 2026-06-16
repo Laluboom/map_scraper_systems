@@ -40,6 +40,20 @@ def _render(name: str, **ctx) -> HTMLResponse:
     ctx.setdefault("update_info", _update_info)
     return HTMLResponse(_env.get_template(name).render(**ctx))
 
+
+def _needs_setup() -> bool:
+    """Return True if mandatory config keys are missing — should redirect to /setup."""
+    cfg = _read_cfg()
+    gkey = cfg.get("googleplaces", "api_key", fallback="")
+    smtp_pw = cfg.get("email", "smtp_password", fallback="")
+    smtp_user = cfg.get("email", "smtp_user", fallback="")
+    missing_google = not gkey or "PLACEHOLDER" in gkey
+    missing_smtp = not smtp_user or not smtp_pw or "PLACEHOLDER" in smtp_pw
+    return missing_google or missing_smtp
+
+
+_SETUP_EXEMPT = {"/setup", "/setup/save"}
+
 app = FastAPI()
 try:
     init_db()
@@ -47,6 +61,64 @@ except Exception as _db_err:
     import traceback
     print(f"[STARTUP ERROR] Database initialisation failed: {_db_err}")
     traceback.print_exc()
+
+
+@app.middleware("http")
+async def _setup_guard(request, call_next):
+    if request.url.path not in _SETUP_EXEMPT and _needs_setup():
+        return RedirectResponse("/setup")
+    return await call_next(request)
+
+
+@app.get("/setup", response_class=HTMLResponse)
+def setup_page(request: Request, msg: str = "", error: str = ""):
+    cfg = _read_cfg()
+    return _render("setup.html",
+        google_api_key=cfg.get("googleplaces", "api_key", fallback=""),
+        smtp_host=cfg.get("email", "smtp_host", fallback="smtp.gmail.com"),
+        smtp_port=cfg.get("email", "smtp_port", fallback="587"),
+        smtp_user=cfg.get("email", "smtp_user", fallback=""),
+        from_name=cfg.get("email", "from_name", fallback=""),
+        from_email=cfg.get("email", "from_email", fallback=""),
+        msg=msg, error=error)
+
+
+@app.post("/setup/save")
+async def setup_save(request: Request):
+    form = await request.form()
+    google_api_key = (form.get("google_api_key") or "").strip()
+    smtp_host      = (form.get("smtp_host")      or "smtp.gmail.com").strip()
+    smtp_port      = (form.get("smtp_port")      or "587").strip()
+    smtp_user      = (form.get("smtp_user")      or "").strip()
+    smtp_password  = (form.get("smtp_password")  or "").strip()
+    from_name      = (form.get("from_name")      or "").strip()
+    from_email     = (form.get("from_email")     or "").strip()
+
+    errors = []
+    if not google_api_key:
+        errors.append("Google Places API key is required.")
+    if not smtp_user:
+        errors.append("SMTP email/username is required.")
+    if not smtp_password:
+        errors.append("SMTP password is required.")
+    if errors:
+        return RedirectResponse(f"/setup?msg={quote_plus(' '.join(errors))}&error=1", status_code=302)
+
+    cfg = _read_cfg()
+    if not cfg.has_section("googleplaces"):
+        cfg.add_section("googleplaces")
+    if not cfg.has_section("email"):
+        cfg.add_section("email")
+    cfg.set("googleplaces", "api_key",       google_api_key)
+    cfg.set("email",        "smtp_host",     smtp_host)
+    cfg.set("email",        "smtp_port",     smtp_port)
+    cfg.set("email",        "smtp_user",     smtp_user)
+    cfg.set("email",        "smtp_password", smtp_password)
+    cfg.set("email",        "from_name",     from_name or smtp_user)
+    cfg.set("email",        "from_email",    from_email or smtp_user)
+    with open(_cfg_path(), "w") as f:
+        cfg.write(f)
+    return RedirectResponse("/", status_code=302)
 
 # Check for updates once at startup; cached for the lifetime of the process
 _update_info: dict | None = None
@@ -72,22 +144,21 @@ def _config_warnings() -> list[str]:
     return warnings
 
 
-# Daily send counter — resets automatically when the date changes
-_send_counter: dict = {"date": None, "count": 0}
-
 def _daily_cap() -> int:
     cfg = _read_cfg()
     return cfg.getint("email", "daily_send_cap", fallback=200)
 
 def _sent_today() -> int:
-    if _send_counter["date"] != date.today():
-        _send_counter["date"] = date.today()
-        _send_counter["count"] = 0
-    return _send_counter["count"]
-
-def _increment_sent(n: int = 1):
-    _sent_today()  # ensure date is current
-    _send_counter["count"] += n
+    from datetime import datetime as _dt
+    today_start = _dt.combine(date.today(), _dt.min.time())
+    db = SessionLocal()
+    try:
+        return db.query(EmailLog).filter(
+            EmailLog.status == "sent",
+            EmailLog.created_at >= today_start,
+        ).count()
+    finally:
+        db.close()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -96,14 +167,14 @@ def dashboard(request: Request):
     try:
         total = db.query(Trader).count()
         priority = db.query(Trader).filter(Trader.priority_flag == True).count()
-        approved = db.query(Trader).filter(Trader.approved == True).count()
+        rejected = db.query(Trader).filter(Trader.approved == False).count()
         sent = db.query(Trader).filter(Trader.email_status == "sent").count()
         bounced = db.query(Trader).filter(Trader.email_status == "bounced").count()
         valid = db.query(Trader).filter(Trader.email_valid == True).count()
     finally:
         db.close()
     return _render("dashboard.html",
-        stats={"total": total, "priority": priority, "approved": approved,
+        stats={"total": total, "priority": priority, "rejected": rejected,
                "sent": sent, "bounced": bounced, "valid": valid},
         config_warnings=_config_warnings())
 
@@ -115,31 +186,16 @@ def contacts(request: Request, filter: str = "all"):
         q = db.query(Trader)
         if filter == "priority":
             q = q.filter(Trader.priority_flag == True)
-        elif filter == "approved":
-            q = q.filter(Trader.approved == True)
         elif filter == "rejected":
             q = q.filter(Trader.approved == False)
         elif filter == "pending":
-            q = q.filter(Trader.approved == True, Trader.email_status == "pending")
+            q = q.filter(Trader.approved.isnot(False), Trader.email_status == "pending")
         elif filter == "unsubscribed":
             q = q.filter(Trader.unsubscribed == True)
         traders = q.order_by(Trader.priority_flag.desc()).limit(500).all()
     finally:
         db.close()
     return _render("contacts.html", traders=traders, filter=filter)
-
-
-@app.post("/contacts/{trader_id}/approve")
-def approve(trader_id: str):
-    db = SessionLocal()
-    try:
-        t = db.query(Trader).filter(Trader.id == trader_id).first()
-        if t:
-            t.approved = True
-            db.commit()
-    finally:
-        db.close()
-    return RedirectResponse("/contacts", status_code=302)
 
 
 @app.post("/contacts/{trader_id}/reject")
@@ -157,15 +213,13 @@ def reject(trader_id: str):
 
 @app.post("/contacts/{trader_id}/reset")
 def reset(trader_id: str):
+    """Un-reject a contact — clears the rejection flag so they will be sent to again."""
     db = SessionLocal()
     try:
         t = db.query(Trader).filter(Trader.id == trader_id).first()
         if t:
             t.approved = None
-            t.email_status = "pending"
-            t.sent_at = None
             db.commit()
-            db.refresh(t)
     finally:
         db.close()
     return RedirectResponse("/contacts", status_code=302)
@@ -392,7 +446,7 @@ def send_page(request: Request, msg: str = "", error: str = ""):
     db = SessionLocal()
     try:
         ready = db.query(Trader).filter(
-            Trader.approved == True,
+            Trader.approved.isnot(False),
             Trader.email_status == "pending",
             Trader.email != None,
             Trader.email_valid.isnot(False),
@@ -432,7 +486,7 @@ def send_start():
         db = SessionLocal()
         try:
             traders = db.query(Trader).filter(
-                Trader.approved == True,
+                Trader.approved.isnot(False),
                 Trader.email_status == "pending",
                 Trader.email != None,
                 Trader.email_valid.isnot(False),
@@ -462,7 +516,6 @@ def send_start():
                 if result["success"]:
                     trader.sent_at = datetime.utcnow()
                     sent_count += 1
-                    _increment_sent()
                     log.info(f"Sent to {trader.email} ({trader.company_name})")
                 else:
                     failed_count += 1
