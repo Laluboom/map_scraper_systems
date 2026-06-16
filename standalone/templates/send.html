@@ -41,15 +41,16 @@
 {% endif %}
 
 <p style="margin-bottom:16px;">
-  <strong>{{ ready }}</strong> approved traders with valid emails ready to send.
+  <strong>{{ ready }}</strong> contacts with valid emails ready to send.
   Emails are sent one-by-one at the throttle rate set in <code>config.ini</code>.
+  Rejected contacts are excluded automatically.
 </p>
 
 {% if ready > 0 %}
-<form method="post" action="/send/start" onsubmit="return confirm('Send to {{ ready }} traders?');">
+<form method="post" action="/send/start" onsubmit="return confirm('Send to {{ ready }} contacts?');">
   <button class="btn btn-primary" type="submit">Send Now ({{ ready }} emails)</button>
 </form>
 {% else %}
-<p style="color:#888;">No traders ready. Go to <a href="/contacts">Contacts</a> and approve traders first.</p>
+<p style="color:#888;">No contacts ready. Run a scrape first, or check if all contacts have been sent to or rejected.</p>
 {% endif %}
 {% endblock %}

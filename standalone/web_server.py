@@ -494,7 +494,7 @@ def send_start():
             ).all()
             total = len(traders)
             if not total:
-                jobs.mark_complete(job.id, "No approved traders ready to send")
+                jobs.mark_complete(job.id, "No contacts ready to send")
                 return
 
             sent_count = failed_count = 0
@@ -717,14 +717,14 @@ def contacts_export():
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["Company", "Email", "Phone", "Website", "City", "State",
-                "Priority", "Email Valid", "Approved", "Email Status", "Sent At", "Tags"])
+                "Priority", "Email Valid", "Rejected", "Email Status", "Sent At", "Tags"])
     for t in traders:
         w.writerow([
             t.company_name or "", t.email or "", t.phone or "",
             t.website or "", t.city or "", t.state or "",
             "Yes" if t.priority_flag else "No",
             "Yes" if t.email_valid else ("No" if t.email_valid is False else ""),
-            "Approved" if t.approved else ("Rejected" if t.approved is False else ""),
+            "Yes" if t.approved is False else "No",
             t.email_status or "",
             t.sent_at.strftime("%Y-%m-%d %H:%M") if t.sent_at else "",
             ", ".join(t.product_tags) if t.product_tags else (t.tags or ""),
