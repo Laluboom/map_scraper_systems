@@ -417,10 +417,14 @@ async def compose_send(request: Request):
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email_sender import build_email_body
 
         smtp_host = cfg.get("email", "smtp_host", fallback="smtp.gmail.com")
         smtp_port = cfg.getint("email", "smtp_port", fallback=587)
         smtp_user = cfg.get("email", "smtp_user", fallback="")
+
+        # Substitute {greeting}/{company_name} placeholders so they don't appear literally
+        body = build_email_body(None, body)
 
         mime = MIMEMultipart("alternative")
         mime["Subject"] = subject
@@ -428,17 +432,22 @@ async def compose_send(request: Request):
         mime["To"]      = to_email
         mime.attach(MIMEText(body, "plain", "utf-8"))
 
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(from_email_val, to_email, mime.as_string())
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.login(smtp_user, smtp_password)
+                server.sendmail(from_email_val, to_email, mime.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(from_email_val, to_email, mime.as_string())
 
         return RedirectResponse(f"/compose?msg=Email+sent+to+{quote_plus(to_email)}", status_code=302)
     except Exception as exc:
-        print(f"[compose/send] error: {exc}")
-        return RedirectResponse("/compose?msg=Send+failed.+Check+terminal+for+details.&error=1", status_code=302)
+        log.error(f"compose/send: {exc}")
+        return RedirectResponse(f"/compose?msg={quote_plus(f'Send failed: {exc}')}&error=1", status_code=302)
 
 
 @app.get("/send", response_class=HTMLResponse)

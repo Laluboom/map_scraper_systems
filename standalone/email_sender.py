@@ -71,7 +71,7 @@ def build_email_body(company_name: str | None, body_template: str) -> str:
     greeting = company_name if company_name else "Sir"
     try:
         return body_template.format(company_name=company_name or "", greeting=greeting)
-    except KeyError:
+    except (KeyError, ValueError, IndexError):
         return body_template
 
 
@@ -99,12 +99,17 @@ def send_one(to_email: str, company_name: str | None) -> dict:
     msg.attach(MIMEText(body, "plain", "utf-8"))
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(from_email, to_email, msg.as_string())
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.login(smtp_user, smtp_password)
+                server.sendmail(from_email, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(from_email, to_email, msg.as_string())
         return {"success": True, "message_id": ""}
     except Exception as exc:
         return {"success": False, "error": str(exc)}

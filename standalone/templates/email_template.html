@@ -39,8 +39,25 @@
 
       <div style="margin-bottom:14px;">
         <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">Body</label>
-        <textarea name="body" rows="22"
-          style="width:100%;padding:10px;border:1px solid #ccc;border-radius:4px;font-size:0.83rem;font-family:monospace;resize:vertical;">{{ body }}</textarea>
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#f5f6fa;border:1px solid #ccc;border-bottom:none;border-radius:4px 4px 0 0;flex-wrap:wrap;">
+          <span style="font-size:0.75rem;color:#888;">Font:</span>
+          <select onchange="document.getElementById('templateBody').style.fontFamily=this.value"
+            style="font-size:0.78rem;padding:2px 6px;border:1px solid #ccc;border-radius:3px;">
+            <option value="'Consolas','Courier New',monospace">Monospace</option>
+            <option value="Inter,'Segoe UI',Arial,sans-serif">Sans-serif</option>
+          </select>
+          <span style="font-size:0.75rem;color:#888;margin-left:6px;">Size:</span>
+          <select onchange="document.getElementById('templateBody').style.fontSize=this.value"
+            style="font-size:0.78rem;padding:2px 6px;border:1px solid #ccc;border-radius:3px;">
+            <option value="0.78rem">Small</option>
+            <option value="0.83rem" selected>Normal</option>
+            <option value="0.95rem">Large</option>
+            <option value="1.05rem">X-Large</option>
+          </select>
+          <span style="font-size:0.72rem;color:#aaa;margin-left:auto;font-style:italic;">display only — does not affect sent email</span>
+        </div>
+        <textarea name="body" id="templateBody" rows="22"
+          style="width:100%;padding:10px;border:1px solid #ccc;border-top:none;border-radius:0 0 4px 4px;font-size:0.83rem;font-family:'Consolas','Courier New',monospace;resize:vertical;line-height:1.25;">{{ body }}</textarea>
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;">
@@ -67,7 +84,7 @@
         <span style="color:#888;font-size:0.78rem;">To:</span> contact@gulfmetals.com<br>
         <span style="color:#888;font-size:0.78rem;">Subject:</span> <strong>{{ subject }}</strong>
       </div>
-      <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.85rem;margin:0;">{{ preview_body }}</pre>
+      <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.85rem;margin:0;line-height:1.25;">{{ preview_body }}</pre>
     </div>
   </div>
 

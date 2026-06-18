@@ -5,14 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Supplier Scraper</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Inter, Segoe UI, Arial, sans-serif; background: #f5f6fa; color: #222; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      font-size: 0.9rem;
+      line-height: 1.25;
+      color: #222;
+      background: #f5f6fa;
+      -webkit-text-size-adjust: 100%;
+    }
+    /* Lock monospace elements — browsers vary wildly on these defaults */
+    pre, code, kbd, samp, textarea, input, select, button {
+      font-family: inherit;
+      font-size: inherit;
+      line-height: 1.25;
+    }
+    pre, textarea { font-family: "Consolas", "Courier New", monospace; tab-size: 4; }
+    /* Headings — fixed sizes, not relative to user zoom */
+    h1 { font-size: 1.4rem; line-height: 1.2; margin-bottom: 20px; }
+    h2 { font-size: 1.1rem; line-height: 1.2; }
+    h3 { font-size: 0.95rem; line-height: 1.2; }
     nav { background: #1565c0; color: white; padding: 12px 24px; display: flex; gap: 24px; align-items: center; }
     nav a { color: white; text-decoration: none; font-weight: 500; }
     nav a:hover { text-decoration: underline; }
     nav .brand { font-size: 1.1rem; font-weight: 700; margin-right: auto; }
     main { padding: 28px; max-width: 1300px; margin: 0 auto; }
-    h1 { margin-bottom: 20px; font-size: 1.4rem; }
     table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
     th, td { padding: 10px 14px; text-align: left; font-size: 0.85rem; border-bottom: 1px solid #eee; }
     th { background: #e3eaf7; font-weight: 600; }

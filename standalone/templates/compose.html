@@ -37,8 +37,25 @@
 
       <div style="margin-bottom:18px;">
         <label style="display:block;font-size:0.82rem;color:#555;margin-bottom:4px;">Body</label>
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#f5f6fa;border:1px solid #ccc;border-bottom:none;border-radius:4px 4px 0 0;flex-wrap:wrap;">
+          <span style="font-size:0.75rem;color:#888;">Font:</span>
+          <select onchange="document.getElementById('bodyField').style.fontFamily=this.value"
+            style="font-size:0.78rem;padding:2px 6px;border:1px solid #ccc;border-radius:3px;">
+            <option value="'Consolas','Courier New',monospace">Monospace</option>
+            <option value="Inter,'Segoe UI',Arial,sans-serif">Sans-serif</option>
+          </select>
+          <span style="font-size:0.75rem;color:#888;margin-left:6px;">Size:</span>
+          <select onchange="document.getElementById('bodyField').style.fontSize=this.value"
+            style="font-size:0.78rem;padding:2px 6px;border:1px solid #ccc;border-radius:3px;">
+            <option value="0.78rem">Small</option>
+            <option value="0.83rem" selected>Normal</option>
+            <option value="0.95rem">Large</option>
+            <option value="1.05rem">X-Large</option>
+          </select>
+          <span style="font-size:0.72rem;color:#aaa;margin-left:auto;font-style:italic;">display only — does not affect sent email</span>
+        </div>
         <textarea name="body" id="bodyField" rows="18" required
-          style="width:100%;padding:10px;border:1px solid #ccc;border-radius:4px;font-size:0.83rem;font-family:monospace;resize:vertical;">{{ body }}</textarea>
+          style="width:100%;padding:10px;border:1px solid #ccc;border-top:none;border-radius:0 0 4px 4px;font-size:0.83rem;font-family:'Consolas','Courier New',monospace;resize:vertical;line-height:1.25;">{{ body }}</textarea>
       </div>
 
       <div style="display:flex;gap:10px;">
@@ -59,7 +76,7 @@
         <span style="color:#888;font-size:0.78rem;">To:</span> <span id="prev-to">—</span><br>
         <span style="color:#888;font-size:0.78rem;">Subject:</span> <strong id="prev-subject">{{ subject }}</strong>
       </div>
-      <pre id="prev-body" style="white-space:pre-wrap;font-family:inherit;font-size:0.85rem;margin:0;">{{ body }}</pre>
+      <pre id="prev-body" style="white-space:pre-wrap;font-family:inherit;font-size:0.85rem;margin:0;line-height:1.25;">{{ body }}</pre>
     </div>
   </div>
 
