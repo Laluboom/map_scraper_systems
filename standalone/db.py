@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 _BASE = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
 
-_cfg = configparser.ConfigParser()
+_cfg = configparser.ConfigParser(interpolation=None)
 _cfg.read(_BASE / "config.ini")
 _db_path_raw = _cfg.get("database", "db_path", fallback="supplier_scraper.db")
 # Resolve relative paths against the app's base directory, not CWD

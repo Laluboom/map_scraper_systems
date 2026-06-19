@@ -48,7 +48,7 @@ _TEMPLATE_FILE = _BASE / "email_template.txt"
 
 def load_template() -> tuple[str, str]:
     """Return (subject, body_template) from disk, falling back to defaults."""
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(_BASE / "config.ini")
     subject = cfg.get("email", "subject", fallback=DEFAULT_SUBJECT)
     body = _TEMPLATE_FILE.read_text(encoding="utf-8") if _TEMPLATE_FILE.exists() else DEFAULT_BODY
@@ -57,7 +57,7 @@ def load_template() -> tuple[str, str]:
 
 def save_template(subject: str, body: str):
     """Persist subject to config.ini and body to email_template.txt."""
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(_BASE / "config.ini")
     if not cfg.has_section("email"):
         cfg.add_section("email")
@@ -76,7 +76,7 @@ def build_email_body(company_name: str | None, body_template: str) -> str:
 
 
 def send_one(to_email: str, company_name: str | None) -> dict:
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(_BASE / "config.ini")
 
     smtp_host     = cfg.get("email", "smtp_host",     fallback="")

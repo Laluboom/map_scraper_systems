@@ -31,7 +31,7 @@ CITIES_FILE = BASE_DIR / "cities_us.txt"
 # ── Config helpers ─────────────────────────────────────────────────────────
 
 def _load_cfg() -> configparser.ConfigParser:
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(CONFIG_PATH)
     return cfg
 
@@ -328,9 +328,11 @@ def send(priority_only, dry_run):
     db = SessionLocal()
     try:
         q = db.query(Trader).filter(
-            Trader.approved == True,
+            Trader.approved.isnot(False),
             Trader.email_status == "pending",
             Trader.email != None,
+            Trader.email_valid.isnot(False),
+            Trader.unsubscribed.isnot(True),
         )
         if priority_only:
             q = q.filter(Trader.priority_flag == True)
@@ -395,7 +397,7 @@ def status():
     try:
         total    = db.query(Trader).count()
         priority = db.query(Trader).filter(Trader.priority_flag == True).count()
-        approved = db.query(Trader).filter(Trader.approved == True).count()
+        approved = db.query(Trader).filter(Trader.approved.isnot(False)).count()
         valid    = db.query(Trader).filter(Trader.email_valid == True).count()
         sent     = db.query(Trader).filter(Trader.email_status == "sent").count()
         bounced  = db.query(Trader).filter(Trader.email_status == "bounced").count()

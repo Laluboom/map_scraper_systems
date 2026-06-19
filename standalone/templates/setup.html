@@ -54,11 +54,33 @@
       <label>Your Name (shown in From field)</label>
       <input name="from_name" value="{{ from_name }}" placeholder="John Doe">
 
-      <div style="display:none;">
-        <input name="smtp_host" value="{{ smtp_host or 'smtp.gmail.com' }}">
-        <input name="smtp_port" value="{{ smtp_port or '587' }}">
-        <input name="from_email" value="{{ from_email }}">
-      </div>
+      <details style="margin-bottom:12px;">
+        <summary style="font-size:0.82rem;color:#1565c0;cursor:pointer;user-select:none;">Custom domain / non-Gmail? Click to set SMTP server</summary>
+        <div style="margin-top:10px;padding:12px;background:#f5f6fa;border-radius:4px;border:1px solid #e3eaf7;">
+          <p style="font-size:0.76rem;color:#888;margin-bottom:10px;">
+            Enter any SMTP server — common examples:<br>
+            Gmail: <code>smtp.gmail.com</code> port <code>587</code> &nbsp;|&nbsp;
+            Outlook: <code>smtp-mail.outlook.com</code> port <code>587</code><br>
+            Zoho: <code>smtp.zoho.com</code> port <code>465</code> &nbsp;|&nbsp;
+            Custom domain: use whatever host your provider gave you (e.g. <code>mail.yourdomain.com</code>), port is usually <code>465</code> or <code>587</code>.
+          </p>
+          <div class="row">
+            <div>
+              <label>SMTP Host</label>
+              <input name="smtp_host" value="{{ smtp_host or 'smtp.gmail.com' }}" placeholder="smtp.gmail.com">
+            </div>
+            <div style="max-width:150px;">
+              <label>Port</label>
+              <select name="smtp_port" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;margin-bottom:12px;">
+                <option value="587" {% if not smtp_port or smtp_port == '587' %}selected{% endif %}>587 — STARTTLS</option>
+                <option value="465" {% if smtp_port == '465' %}selected{% endif %}>465 — SSL/TLS</option>
+              </select>
+            </div>
+          </div>
+          <label>From Email <span style="font-size:0.76rem;color:#888;">(if different from username above)</span></label>
+          <input name="from_email" value="{{ from_email }}" placeholder="leave blank to use same as username">
+        </div>
+      </details>
     </div>
 
     <button class="btn" type="submit">Save &amp; Open Dashboard</button>

@@ -5,7 +5,21 @@ Tries homepage → /contact → /about if needed.
 import re
 from urllib.parse import urljoin, urlparse
 
-EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}")
+
+# File/asset extensions that are never valid TLDs — filters srcset/JS false positives
+_ASSET_TLDS = {
+    "png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "bmp", "tiff",
+    "js", "jsx", "ts", "tsx", "css", "scss", "sass", "less", "vue",
+    "woff", "woff2", "ttf", "eot", "otf", "mp4", "mp3", "pdf",
+    "zip", "gz", "tar", "map", "json", "xml",
+}
+
+
+def _valid_email(email: str) -> bool:
+    tld = email.rsplit(".", 1)[-1].lower()
+    return tld.isalpha() and tld not in _ASSET_TLDS
+
 
 GENERIC_PREFIXES = {
     "noreply", "no-reply", "donotreply", "support", "webmaster",
@@ -57,7 +71,7 @@ def extract_email_and_text(website_url: str | None) -> tuple[str | None, str]:
     # Try homepage first
     html = _fetch(website_url)
     all_text = html
-    emails = EMAIL_RE.findall(html)
+    emails = [e for e in EMAIL_RE.findall(html) if _valid_email(e)]
     found = _best_email(emails)
     if found:
         return found.lower(), all_text
@@ -66,7 +80,7 @@ def extract_email_and_text(website_url: str | None) -> tuple[str | None, str]:
     for path in SUBPAGES:
         html = _fetch(urljoin(base, path))
         all_text += html
-        emails = EMAIL_RE.findall(html)
+        emails = [e for e in EMAIL_RE.findall(html) if _valid_email(e)]
         found = _best_email(emails)
         if found:
             return found.lower(), all_text

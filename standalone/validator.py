@@ -8,7 +8,7 @@ _BASE = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(_
 
 
 def validate(email: str) -> bool:
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(_BASE / "config.ini")
     hunterio_key = cfg.get("validation", "hunterio_api_key", fallback="")
     zerobounce_key = cfg.get("validation", "zerobounce_api_key", fallback="")

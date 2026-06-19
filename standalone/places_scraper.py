@@ -168,14 +168,19 @@ def run_places_scrape(
                         print_fn(f"\n  BILLING LIMIT REACHED: {exc}")
                         mark_done(db, city, state, term, saved)
                         return
-                    except Exception:
-                        details = place  # fall back to search result
+                    except Exception as exc:
+                        print_fn(f"    [skip] {place.get('name','?')} — Place Details failed: {exc}")
+                        continue
 
                     details["place_id"] = place_id
 
                     # Extract email + website text in one fetch (avoids double request)
                     website = details.get("website") or place.get("website")
                     email, website_text = extract_email_and_text(website)
+
+                    if not email:
+                        print_fn(f"    [skip] {details.get('name','?')} — no email found")
+                        continue
 
                     score, tags = score_company(
                         name         = details.get("name", ""),

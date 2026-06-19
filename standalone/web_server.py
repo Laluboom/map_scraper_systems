@@ -20,7 +20,7 @@ def _cfg_path() -> Path:
 
 
 def _read_cfg() -> configparser.ConfigParser:
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(_cfg_path())
     return cfg
 
@@ -542,7 +542,7 @@ def send_start():
             log.info(f"Campaign complete — sent: {sent_count}, failed: {failed_count}")
         except Exception as exc:
             log.error(f"Campaign error: {exc}")
-            jobs.mark_complete(job.id, f"Campaign error — check supplier_scraper.log")
+            jobs.mark_failed(job.id, f"Campaign error — check supplier_scraper.log")
         finally:
             db.close()
 
@@ -562,14 +562,14 @@ def send_cancel(job_id: str):
 
 def _scrape_page_ctx(msg="", error=""):
     if getattr(sys, "frozen", False):
-        _cfg_path = Path(sys.executable).parent / "config.ini"
+        config_file = Path(sys.executable).parent / "config.ini"
         _cities_path = Path(sys.executable).parent / "cities_us.txt"
     else:
-        _cfg_path = Path(__file__).parent / "config.ini"
+        config_file = Path(__file__).parent / "config.ini"
         _cities_path = Path(__file__).parent / "cities_us.txt"
 
-    cfg = configparser.ConfigParser()
-    cfg.read(_cfg_path)
+    cfg = configparser.ConfigParser(interpolation=None)
+    cfg.read(config_file)
     rescrape_days = cfg.getint("googleplaces", "rescrape_days", fallback=30)
     raw_terms = cfg.get("googleplaces", "search_terms",
                         fallback="scrap metal recycling,copper recycling,electric motor scrap")
@@ -623,14 +623,14 @@ async def scrape_start(request: Request):
         return RedirectResponse(f"/scrape?msg={quote_plus(msg)}", status_code=302)
 
     if getattr(sys, "frozen", False):
-        _cfg_path = Path(sys.executable).parent / "config.ini"
+        config_file = Path(sys.executable).parent / "config.ini"
         _cities_path = Path(sys.executable).parent / "cities_us.txt"
     else:
-        _cfg_path = Path(__file__).parent / "config.ini"
+        config_file = Path(__file__).parent / "config.ini"
         _cities_path = Path(__file__).parent / "cities_us.txt"
 
-    cfg = configparser.ConfigParser()
-    cfg.read(_cfg_path)
+    cfg = configparser.ConfigParser(interpolation=None)
+    cfg.read(config_file)
     api_key = cfg.get("googleplaces", "api_key", fallback="")
     if not api_key or "PLACEHOLDER" in api_key:
         return RedirectResponse("/scrape?msg=Google+Places+API+key+not+set.+Run+setup+first.&error=1", status_code=302)
@@ -754,7 +754,7 @@ def settings_page(request: Request, msg: str = "", error: str = ""):
         smtp_host=cfg.get("email", "smtp_host", fallback="smtp.gmail.com"),
         smtp_port=cfg.get("email", "smtp_port", fallback="587"),
         smtp_user=cfg.get("email", "smtp_user", fallback=""),
-        smtp_password=cfg.get("email", "smtp_password", fallback=""),
+        smtp_password_set=bool(cfg.get("email", "smtp_password", fallback="")),
         msg=msg, error=error)
 
 
