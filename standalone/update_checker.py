@@ -12,7 +12,7 @@ import json
 
 # Public Gist raw URL — edit this file to publish updates to the client
 # Format: { "version": "1.0.1", "download_url": "https://...", "notes": "..." }
-MANIFEST_URL = "https://gist.githubusercontent.com/Laluboom/2d0d8017ff97f1ccc70d7141d0ab1ea2/raw/version.json"
+MANIFEST_URL = "https://gist.githubusercontent.com/Laluboom/2d0d8017ff97f1ccc70d7141d0ab1ea2/raw/Supplier_Scraper.json"
 
 
 def _parse_version(v: str) -> tuple:

@@ -69,7 +69,7 @@
 
   <!-- Live preview -->
   <div>
-    <div style="font-weight:600;margin-bottom:8px;font-size:0.95rem;">Preview</div>
+    <div style="font-weight:600;margin-bottom:8px;font-size:0.95rem;">Preview <span style="font-weight:400;color:#888;font-size:0.78rem;">— <code>{greeting}</code> → "Sir", <code>{company_name}</code> → ""</span></div>
     <div id="preview" style="background:white;border:1px solid #ddd;border-radius:6px;padding:16px;font-size:0.85rem;">
       <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #eee;line-height:1.7;">
         <span style="color:#888;font-size:0.78rem;">From:</span> <span id="prev-from">{{ from_name }} &lt;{{ from_email }}&gt;</span><br>
@@ -90,7 +90,10 @@
       (form.from_name.value || '—') + ' <' + (form.from_email.value || '—') + '>';
     document.getElementById('prev-to').textContent = form.to_email.value || '—';
     document.getElementById('prev-subject').textContent = form.subject.value || '—';
-    document.getElementById('prev-body').textContent = form.body.value || '';
+    var previewBody = (form.body.value || '')
+      .replace(/\{greeting\}/g, 'Sir')
+      .replace(/\{company_name\}/g, '');
+    document.getElementById('prev-body').textContent = previewBody;
   }
   ['from_name','from_email','to_email','subject','body'].forEach(function(n) {
     form[n].addEventListener('input', update);
