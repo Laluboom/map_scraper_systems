@@ -27,6 +27,12 @@ TEXT_SEARCH_URL  = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 DETAILS_URL      = "https://maps.googleapis.com/maps/api/place/details/json"
 DETAILS_FIELDS   = "name,formatted_phone_number,website,formatted_address,url,types,rating"
 
+OK_STATUSES = {"OK", "ZERO_RESULTS"}
+
+
+class PlacesApiError(Exception):
+    pass
+
 
 # ── API calls ──────────────────────────────────────────────────────────────
 
@@ -37,7 +43,11 @@ def _text_search_page(api_key: str, query: str, page_token: str = "") -> dict:
         params = {"pagetoken": page_token, "key": api_key}
     r = httpx.get(TEXT_SEARCH_URL, params=params, timeout=10)
     r.raise_for_status()
-    return r.json()
+    data = r.json()
+    status = data.get("status")
+    if status not in OK_STATUSES:
+        raise PlacesApiError(data.get("error_message") or status)
+    return data
 
 
 def search_places(api_key: str, query: str) -> list[dict]:
@@ -62,7 +72,11 @@ def get_place_details(api_key: str, place_id: str) -> dict:
                   params={"place_id": place_id, "fields": DETAILS_FIELDS, "key": api_key},
                   timeout=10)
     r.raise_for_status()
-    return r.json().get("result", {})
+    data = r.json()
+    status = data.get("status")
+    if status not in OK_STATUSES:
+        raise PlacesApiError(data.get("error_message") or status)
+    return data.get("result", {})
 
 
 # ── DB save ────────────────────────────────────────────────────────────────
