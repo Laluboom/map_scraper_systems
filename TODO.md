@@ -1,99 +1,135 @@
 # TODO — Supplier Scraper & Outreach System
 
-Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
+Ranked, best first. Reviewed 2026-09-20. Everything below is anchored to code I read.
 
 ---
 
-## Phase 0 — Google Places API Scraper ✅ COMPLETE
+## 1. [BUG] Google Places error statuses are never checked — a failed scrape silently marks every area "done"
 
-- [x] Build `places_scraper.py` — Google Places Text Search + Place Details via httpx, paginate up to 3 pages (60 results/query), dedup by `google_place_id`
-- [x] Build `website_email_extractor.py` — visits homepage + /contact + /about, regex email extraction, filters generic prefixes (noreply, admin, etc.)
-- [x] Build `area_manager.py` — `is_done()` / `mark_done()` / `get_progress()` backed by `ScrapedArea` DB table
-- [x] Build `keyword_classifier.py` — 3-layer scoring: company name (+30), Google place types (+40/+20), website text (+30), max score 100
-- [x] Wire all into `cli.py` scrape command — `--city`, `--all-us`, `--resume`, `--terms` options
-- [x] Add `cities_us.txt` — ~250 US cities, format "City, ST"
-- [x] Add `search_terms.txt` — 8 default queries (reference; active terms live in config.ini)
-- [x] Update `config.ini.example` — added `[googleplaces]` section with api_key, rescrape_days, search_terms, priority_threshold
-- [x] Update `PLACEHOLDERS.md` — replaced PH-009 to PH-018 (spider CSS selectors) with single Google Places API key entry
-- [x] Update web dashboard scrape page — city progress bar, Scrape City / Scrape All / Resume buttons, recently scraped areas table
-- [x] Update `models.py` — added `priority_score`, `google_place_id`, `google_rating`, `google_url` to Trader; added `ScrapedArea` table
-- [x] Update `cli.py` — fully rewritten with `setup` wizard, interactive API key prompting, `send` loop with per-trader status update + EmailLog
+`standalone/places_scraper.py:38` and `:64` only call `r.raise_for_status()`. The Places API
+returns **HTTP 200** for `REQUEST_DENIED`, `OVER_QUERY_LIMIT` and `INVALID_REQUEST` — the error
+lives in the JSON `status` / `error_message` fields, which nothing in this repo reads
+(`grep -n "status" places_scraper.py` → only `raise_for_status`).
 
----
+Failure chain:
+- `_text_search_page` returns `{"status": "REQUEST_DENIED", ...}` with no `results` key
+- `search_places` (`:51`) does `data.get("results", [])` → `[]`
+- the per-place loop at `:151` never executes, `saved` stays 0
+- `mark_done(db, city, state, term, 0)` at `:195` still runs
+- `is_done` (`standalone/area_manager.py:13-22`) now skips that area for `rescrape_days` (30)
 
-## Phase 1 — Test the standalone app end-to-end
+So a full `--all-us` run with a bad key or billing disabled walks all 267 cities × N terms,
+prints `→ saved 0 new trader(s)` 800+ times, and then `--resume` skips everything for a month.
+This is not hypothetical — the old TODO recorded Google billing as never enabled, which is
+exactly the state that produces `REQUEST_DENIED`.
 
-- [x] **Install dependencies** — venv at `standalone/.venv`; run with `.venv/bin/python cli.py <cmd>`
-  - Note: `scrapy` and `selenium` removed from install (unused in standalone flow); `sqlalchemy` pinned to `>=2.0.36` for Python 3.14 compatibility
-- [x] **Fresh DB** — old stale DB deleted; `init_db()` recreated schema cleanly; `status` confirmed all-zero
-- [x] **Launch dashboard** — all 5 pages (`/`, `/contacts`, `/scrape`, `/send`, `/logs`) return HTTP 200
-- [ ] **Enable Google billing** — go to console.cloud.google.com/billing, link billing account, then enable **Places API (New)** in the API library. The key `AIzaSyB7iw4-…` is already in `config.ini` and will work immediately after.
-- [ ] **Test single-city scrape** — `python cli.py scrape --city "Dallas, TX"` — confirm traders saved with scores and emails
-- [ ] **Check status** — `python cli.py status` — verify city/trader/priority counts
-- [ ] **Test contacts page** — open http://localhost:8080/contacts, approve a few traders manually
-- [ ] **Test dry-run send** — `python cli.py send --dry-run` — confirm approved traders appear
-- [ ] **Add SendGrid key** — run `python cli.py setup` and enter SendGrid API key + verified sender email
-- [ ] **Test email send** — `python cli.py send` — confirm `email_status` flips to "sent"/"bounced"
-- [ ] **Test resume** — run scrape again with `--resume` — confirm already-done cities are skipped
+Same bug truncates pagination: `search_places` sleeps 2s before reusing `next_page_token`
+(`:49`), and Google intermittently answers `INVALID_REQUEST` if the token isn't warm yet —
+silently capping results at 20 instead of 60.
 
----
+Do:
+- In `_text_search_page` / `get_place_details`, read `data.get("status")`. Accept `OK` and
+  `ZERO_RESULTS`; raise a `PlacesApiError` carrying `error_message` for everything else.
+- In `run_places_scrape`, only call `mark_done` when the search genuinely succeeded.
+- Add one unit test: a mocked 200 response with `status="REQUEST_DENIED"` must leave
+  `ScrapedArea` empty. That single test also covers the ghost-record class of bug that
+  commit `9fdddf5` fixed by hand.
 
-## Phase 2 — Package as .exe (PyInstaller)
-
-- [ ] Update `supplier_scraper.spec` — add new files to `datas`: `cities_us.txt`, `search_terms.txt`, new `.py` modules
-- [ ] Run `pyinstaller supplier_scraper.spec` on Windows (or via Wine / cross-compile)
-- [ ] Test the built `.exe` — run `supplier_scraper.exe setup` then `supplier_scraper.exe scrape --city "Dallas, TX"`
-- [ ] Verify `config.ini` and `supplier_scraper.db` are created next to the `.exe` (not inside the bundle)
-- [ ] Test `supplier_scraper.exe serve` — dashboard must load from bundled templates
+~1 hour.
 
 ---
 
-## Phase 3 — Run full US scrape
+## 2. [BUG] `cli.py send` bypasses the daily send cap that the dashboard enforces
 
-- [ ] Confirm Google Places API billing is enabled (free $200/month credit covers first run)
-- [ ] Run `supplier_scraper.exe scrape --all-us` — let it run overnight
-- [ ] Monitor progress via dashboard `/scrape` page
-- [ ] If interrupted, run `supplier_scraper.exe scrape --all-us --resume` to continue
-- [ ] After full run: `status` command should show 10,000+ traders
+`web_server.py:484-488` checks `_sent_today() >= _daily_cap()` before starting, and re-checks
+inside the loop at `:516`. `cli.py:311-377` has no cap logic at all — it queries every eligible
+trader and sends with only `throttle_per_minute` pacing.
 
----
+Commit `00105ea` added the cap to the web path; commit `9fdddf5` later aligned cli.py's
+*eligibility filter* with the web one but left the cap behind. The client's own README (root,
+"Workflow" step 5) tells them to run `cli.py send --priority-only`, i.e. the uncapped path.
+Gmail cuts off around 500/day and suspends the account — this is the single failure that ends
+the campaign outright.
 
-## Phase 4 — Validate emails
+Do: lift `_daily_cap()` / `_sent_today()` out of `web_server.py` into `email_sender.py` and
+call them from both paths. That also removes one of two copies.
 
-- [ ] Get Hunter.io API key (free tier: 25 verifications/month; paid for bulk)
-- [ ] Run `supplier_scraper.exe validate`
-- [ ] Check dashboard — filter by validated emails before sending
-
----
-
-## Phase 5 — Run outreach campaign
-
-- [ ] Go to dashboard `/contacts` — review and approve priority traders
-- [ ] Run `supplier_scraper.exe send --dry-run` — preview who gets emails
-- [ ] Run `supplier_scraper.exe send --priority-only` — send to priority traders first
-- [ ] Monitor `/logs` page for send/bounce status
-- [ ] Run `supplier_scraper.exe send` for all approved traders
+~30 min.
 
 ---
 
-## Known Issues / Watch Points
+## 3. [BUG] One transient SMTP failure permanently burns a contact
 
-- `web_server.py` scrape page runs the full scrape synchronously (blocking the browser for up to 5 minutes per call). For all-US runs, use the CLI instead of the dashboard. Dashboard is fine for single-city scrapes.
-- `cities_us.txt` has some duplicate city entries (e.g. Glendale CA appears twice, Henderson NV appears twice). This causes a few redundant area records but no data loss — `google_place_id` UNIQUE index prevents duplicate traders.
-- `search_terms.txt` is for reference only — the active terms are read from `config.ini [googleplaces] search_terms`. Edit config.ini to change them.
-- `scraper_runner.py` and legacy Scrapy spiders are still present but unused in the Google Places flow. They can be removed before packaging to reduce `.exe` size.
-- Email status "bounced" is set on any SendGrid API error (including config errors). Check `/logs` for the specific error message if bounces are unexpectedly high.
-- **Python 3.14 compatibility** — `requirements_standalone.txt` pins `sqlalchemy>=2.0.36` (fixed). Earlier versions crash on Python 3.14.
-- **Always run via venv** — use `.venv/bin/python cli.py <cmd>` from `standalone/`. System Python will fail due to missing packages.
-- **config.ini is gitignored** — API keys are safe. Never commit it. Use `config.ini.example` as the template.
+`email_sender.py:114-115` returns `success: False` for *any* exception — timeout, temporary
+4xx greylist, dropped wifi. Both callers (`web_server.py:523`, `cli.py:359`) then write
+`email_status = "bounced"`, which is permanent: the send query requires
+`email_status == "pending"` (`web_server.py:458`, `cli.py:332`), and the only un-do in the UI,
+`/contacts/{id}/reset` (`web_server.py:214-225`), clears `approved` and *not* `email_status`.
+
+A 5-minute network blip mid-campaign silently retires however many prospects were in flight,
+and nothing in the dashboard can bring them back.
+
+Do either (cheapest first):
+- Have `/contacts/{id}/reset` also set `email_status = "pending"` and `sent_at = None`, plus a
+  "Retry failed sends" button on `/send` that resets rows whose last `EmailLog.error_message`
+  looks transient; **or**
+- Distinguish hard bounces (SMTP 5xx / `SMTPRecipientsRefused`) from soft failures in
+  `send_one` and only mark the hard ones.
+
+~45 min.
 
 ---
 
-## Optional Enhancements (future)
+## 4. [IMPROVEMENT] `/contacts/duplicates` is O(n²) and will hang at the target trader count
 
-- [ ] Add ZeroBounce as secondary email validator fallback (key placeholder already in config)
-- [ ] Proxy support — `config.ini [proxy] proxy_url` is read but not yet passed to httpx in `places_scraper.py`
-- [ ] Webhook receiver for SendGrid bounce/reply events
-- [ ] CSV export of trader list from dashboard
-- [ ] EU city list (`cities_eu.txt`) for European outreach
-- [ ] Auto-open browser to dashboard on `serve` start (already implemented, uses `threading.Timer`)
+`web_server.py:248` loads every non-unsubscribed trader into memory, then `:280-292` does a
+full pairwise `SequenceMatcher(...).ratio()` over all of them. The project's own stated goal is
+10,000+ traders after a full US scrape — that is ~50 million ratio() calls, each itself
+quadratic in name length. The page will effectively never return, and it holds a worker thread
+while it tries.
+
+Do: bucket candidates before comparing — group by `company_name.lower()` first token, or by a
+4-char prefix, and only run `SequenceMatcher` within a bucket. Cap group size. Exact-email and
+phone grouping above it (`:254-274`) are already O(n) and fine; leave them.
+
+~45 min.
+
+---
+
+## 5. [QUICK WIN ~15min] The release runbook names the wrong Gist file — it will re-break the update banner
+
+Commit `a08e1a3` fixed `update_checker.py:15` from `version.json` to `Supplier_Scraper.json`
+because the wrong filename 404'd silently and no client ever saw an update banner. But the
+root `README.md` release section still says to create the Gist with filename `version.json`
+(steps 1-2 of "First-time Gist setup") and step 7 still calls it `version.json`. Follow the
+README on the next release and the update channel breaks again, silently, for every client —
+`check_for_update` swallows everything (`update_checker.py:47-48`).
+
+Do: correct the filename in root `README.md` (both places) and in the `update_checker.py`
+docstring, and note in the README that the manifest is fetched once at process start
+(`web_server.py:125-130`) so clients only see it on restart.
+
+~15 min.
+
+---
+
+## Parked / known issues (still true, not yet worth a slot)
+
+- `standalone/cities_us.txt` has **13 duplicate entries** out of 267 (Akron OH, Arvada CO,
+  Billings MT, Costa Mesa CA, Eugene OR, Glendale CA, Henderson NV, Inglewood CA, Lansing MI,
+  Palmdale CA, Peoria IL, Rancho Cucamonga CA, Tallahassee FL). Each costs a redundant Text
+  Search call per term against a hard 10k/month free cap (`billing_guard.py:24-25`). ~5 min to
+  dedupe, worth folding into the next scraper change.
+- `backend/` and `frontend/` are the abandoned Celery + Postgres + Scrapy + Selenium + SendGrid
+  + React stack. Nothing in `standalone/` imports them. `backend/requirements.txt` still pins
+  `python-jose==3.3.0`, `pillow==10.3.0`, `scrapy==2.11.1`; `frontend/` has no lockfile. Dead
+  weight and dependency-scanner noise — delete when convenient.
+- `validator.py:40` returns `True` when no Hunter.io/ZeroBounce key is set, so `email_valid`
+  means "not checked" rather than "verified". Fine, but don't read the dashboard's "valid"
+  count as validation.
+- `website_email_extractor.extract_email_and_text` does up to 6 fetches at 8s timeout each
+  (`:29`, `:44`) — worst case ~48s per place, and the worst case is the *no email* path that
+  gets discarded. Watch this if all-US runs turn out to be slow.
+- `_setup_guard` middleware (`web_server.py:66-70`) re-reads and re-parses `config.ini` from
+  disk on every single HTTP request.
+- `config.ini` is gitignored; never commit it. Do not paste API keys into this file either.
