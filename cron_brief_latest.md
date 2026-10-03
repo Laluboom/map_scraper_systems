@@ -1,84 +1,96 @@
-# Daily review — map_scraper_systems — 2026-09-20
+# Daily brief — map_scraper_systems — 2026-10-03
 
 ## What I looked at
 
-Full git history (24 commits), then the real source: `places_scraper.py`, `area_manager.py`,
-`billing_guard.py`, `website_email_extractor.py`, all 801 lines of `web_server.py`,
-`email_sender.py`, `job_registry.py`, `cli.py`, `update_checker.py`, `validator.py`, the test
-suite, both READMEs, the CHANGELOG, and the dead `backend/` + `frontend/` trees.
+No source file has changed since `a08e1a3` (2026-09-20); the only commit since is last
+review's own notes commit. The branch
+`agent/2026-09-20-google-places-error-statuses-are-never-c` is **zero commits ahead of main** —
+an empty branch. So none of the five items from the 2026-09-20 list was implemented, and all
+five are still real.
 
-I did **not** check it in a browser. Neither `venv` creation nor `pip install` would run in
-this sandbox, and the dashboard is a local server-rendered Jinja app — five minutes of fighting
-the environment wasn't going to tell me more than reading the routes did. All findings below
-come from reading code, with file:line.
+Rather than re-report them, I spent this pass on the part the last review didn't read: the
+packaging and release path — `.github/workflows/build-exe.yml`, `supplier_scraper.spec`, and
+every place the frozen app resolves a file path. Plus a fresh look at `web_server.py`'s send
+path.
+
+I did **not** check it in a browser. This box has no `ensurepip`/`python3-venv`, so
+`python3 -m venv` fails and the app's deps can't be installed; only 4 of the 12 unit tests run
+(`test_job_registry.py` passes, `test_core.py` errors on `import sqlalchemy`). I confirmed the
+UI symptom by reading `templates/scrape.html` against the context `web_server.py` feeds it
+instead.
 
 ## The finding that matters
 
-**The scraper never reads Google's JSON `status` field.** `places_scraper.py:38` and `:64` call
-`r.raise_for_status()` and nothing else. The Places API returns **HTTP 200** for
-`REQUEST_DENIED`, `OVER_QUERY_LIMIT` and `INVALID_REQUEST` — the failure is in the body, not the
-status line. So a denied key produces `data.get("results", [])` → `[]`, the per-place loop at
-`:151` never runs, and then `mark_done(db, city, state, term, 0)` fires at `:195` anyway.
-`is_done` (`area_manager.py:13-22`) proceeds to skip that area for 30 days.
+**The release zip has never contained `cities_us.txt`, so the full-US scrape has never worked
+on the client's machine.**
 
-The consequence is specific and bad: run `--all-us` with billing not yet enabled — which the old
-TODO recorded as still being the case — and the tool marches through all 267 cities printing
-`→ saved 0 new trader(s)`, collects nothing, and writes a full `ScrapedArea` ledger saying it
-did. `--resume` then skips the entire country for a month. Nothing anywhere surfaces
-`error_message`. The same blind spot silently truncates pagination from 60 results to 20
-whenever the `next_page_token` isn't warm after the fixed 2s sleep at `:49`.
+When frozen, all three read sites resolve the city list from the directory *beside the exe* —
+`cli.py:22-28`, `web_server.py:566`, `web_server.py:627`. The spec file *does* bundle it
+(`supplier_scraper.spec:16`), but PyInstaller puts `datas` into `sys._MEIPASS`, and
+`web_server.py:32` is the repo's only `_MEIPASS` use — it covers `templates/` and nothing else.
+So the bundled copy is unreachable, and the beside-the-exe copy doesn't exist, because
+`build-exe.yml:41` zips exactly four files: the exe, `config.ini`, `README.md` and
+`SETUP_GUIDE.pdf`. `git log -p --follow` on the workflow shows `cities_us.txt` was never in the
+zip in any revision since the distribution system landed in `f38f5bd` — v1.0.0 through v1.0.2
+all ship without it, and nothing in the README or setup guide tells the client to create it.
 
-This is the one workflow the product exists for, and it can fail completely without saying so.
+What the client sees: `scrape --all-us` prints "cities_us.txt not found" and exits
+(`cli.py:261`); the dashboard's All-US and Resume buttons bounce with "No cities loaded"
+(`web_server.py:667`); and the Scrape page permanently reads **"0 / 0 city×term combinations
+searched"** with the progress bar suppressed, because `num_cities` is 0
+(`web_server.py:577-580` → `scrape.html:46-47`), while the help text at `scrape.html:71`
+offers to "iterate all 0 city × term combinations". Only single-city scraping has ever worked
+in a shipped build — against a README that documents `--all-us` as a headline feature.
 
-## Also confirmed
+This is a packaging bug, which is why reading `standalone/*.py` alone doesn't surface it. It
+also reframes last review's #1 (the Places `status` blindness): that bug poisons `--resume`
+for 30 days, but `--resume` has never run on the client's machine at all.
 
-`cli.py send` (`:311-377`) has no daily-cap check, while the dashboard path enforces one at
-`web_server.py:484-488` and re-checks it in-loop at `:516`. Commit `00105ea` added the cap to
-the web only; `9fdddf5` later aligned the CLI's eligibility filter but not the cap. The root
-README tells the client to run the uncapped CLI path. Gmail suspends around 500/day.
+## Second finding: the daily send cap is off for five hours every night
 
-Any SMTP exception — timeout, greylist, dropped wifi — becomes `email_status = "bounced"`
-(`email_sender.py:114`, written at `web_server.py:523` / `cli.py:359`), and that is permanent:
-the send query requires `pending`, and `/contacts/{id}/reset` (`:214-225`) clears `approved`
-but not `email_status`. A five-minute network blip quietly retires every prospect in flight.
+`_sent_today()` (`web_server.py:151-161`) builds `today_start` from `date.today()` — **local**
+midnight, naive — but `EmailLog.created_at` is written with `datetime.utcnow()`
+(`web_server.py:537`). The client is in Pakistan, UTC+5. I simulated it under
+`TZ=Asia/Karachi`:
 
-`/contacts/duplicates` loads every trader into memory (`:248`) and does a full pairwise
-`SequenceMatcher` sweep (`:280-292`) — O(n²) against the project's own stated 10,000-trader
-goal. And `cities_us.txt` has 13 duplicate lines out of 267, each burning a Text Search call
-per term against the hard 10k/month counter in `billing_guard.py:24-25`.
+```
+sent local 00:00 -> stored 2026-10-03 19:00 -> counted: False
+sent local 04:00 -> stored 2026-10-03 23:00 -> counted: False
+sent local 05:00 -> stored 2026-10-04 00:00 -> counted: True
+```
+
+Between local midnight and 05:00 the count is **0** regardless of what was just sent, so the
+pre-flight check at `:486` passes and the in-loop re-check at `:516` never trips. A campaign
+started at 00:30 sends the entire pending list uncapped; a campaign running across midnight
+gets a fresh full `daily_send_cap` on top of the one it already spent. Gmail cuts off near
+500/day and then suspends the account — and this is the path that supposedly *has* the cap.
+`cli.py send` (`:311-384`) still has no cap at all, which is the path the README tells the
+client to use. Both get fixed by lifting `_daily_cap()`/`_sent_today()` into
+`email_sender.py` once.
 
 ## Test gap
 
-The most recent bug-shaped commit is `a08e1a3`: the Gist manifest filename was wrong, so
-`update_checker` 404'd and **no client ever saw an update banner** — invisible because
-`update_checker.py:47-48` swallows everything. The single test that would have caught it is a
-network smoke test asserting `httpx.get(MANIFEST_URL)` returns 200 and JSON containing a
-`version` key. There is no test for `update_checker` at all, nor for `places_scraper`,
-`send_one`, `billing_guard`, or any HTTP route. The existing 8 tests are decent but only cover
-pure functions.
-
-Relatedly, the root README's release runbook still says to name the Gist `version.json` — the
-exact mistake `a08e1a3` fixed. Follow the README next release and it breaks again, silently.
-That's the quick win.
+The single assertion closest to the most recent bug-shaped commit: `a08e1a3` fixed the compose
+preview rendering literal `{greeting}` placeholders, i.e. the `build_email_body(None, body)`
+call at `web_server.py:427`. `test_core.py:107-119` tests `build_email_body` with a company
+name and with an unknown placeholder — never with `company_name=None`. Three lines.
 
 ## What I'm proposing
 
-Ranked in `TODO.md`: (1) status-check the Places API and stop marking failed areas done, with a
-regression test; (2) share the daily cap between CLI and web; (3) stop transient SMTP errors
-from permanently burning contacts; (4) bucket before pairwise-matching on the duplicates page;
-(5) the 15-minute README/Gist filename fix. I parked the `cities_us.txt` dedupe and deleting
-the dead `backend/`+`frontend/` stack as known issues rather than spending a slot on them.
+Ranked in `TODO.md`: (1) ship `cities_us.txt` in the zip plus a `_MEIPASS` fallback and a CI
+assertion so it can't regress silently; (2) one shared, timezone-correct daily cap used by both
+send paths; (3) read Google's JSON `status` and stop marking failed areas done — carried over;
+(4) stop a transient SMTP error permanently burning a contact — carried over; (5) quick win,
+fix the three places root `README.md` still names the Gist manifest `version.json` when
+`update_checker.py:15` uses `Supplier_Scraper.json`.
 
-I also rewrote `REFERENCE.md`, which was 312 lines and materially wrong — it still described
-SendGrid as the mail path (removed in `73762a0`) and BeautifulSoup as the extractor (it's plain
-regex). The old `TODO.md` was equally stale: config.ini.example listed as required after
-`d99c016` removed the dependency, CSV export listed as a future enhancement after `cae69f4`
-shipped it, and a partial Google API key pasted into line 30.
+The `/contacts/duplicates` O(n²) item from last review is demoted to parked — it only bites at
+10k traders, and the DB can't reach 10k while task 1 is unfixed.
 
-## Verdict
+## Health
 
-Healthy. This is a real, finished, shipping product with small clean modules, a test suite,
-release automation and a thought-through billing guard — noticeably better engineered than most
-repos at this stage. It's been quiet for three months, which is fine for something that works.
-The one thing to fix before the next scrape run is the silent-failure path, because it doesn't
-just fail — it records success and locks itself out of retrying.
+The code itself is in good shape: small single-purpose modules, 12 real unit tests, sensible
+cancellation and billing guards. The problem has moved downstream — the shipping pipeline is
+now the weakest part of this project, and it's shipping a product whose main workflow doesn't
+start. Tasks 1 and 2 are both under an hour and both affect the client directly; do them
+before anything else on the list.
