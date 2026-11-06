@@ -1,100 +1,93 @@
-# Daily brief — map_scraper_systems (2026-10-13)
+# Daily brief — map_scraper_systems — 2026-11-06
 
 ## What I looked at
 
-Full reads of `places_scraper.py` and `billing_guard.py`, the setup wizard and `/setup` page,
-the daily-send-cap path in `web_server.py`, both send paths, the CSV export, the PyInstaller
-spec, `build-exe.yml`, both test files, and the whole commit history. I traced every
-frozen-vs-dev path resolution site (there are five copies of the same two-line idiom).
+`git log --oneline -30` and `git log -5 --stat` first, then the whole scrape path end to end:
+`places_scraper.py`, `area_manager.py`, `billing_guard.py`, `models.py`, `db.py`, the `scrape`
+and `send` commands in `cli.py`, the `/scrape/*` and `/send/*` routes in `web_server.py`, the
+PyInstaller spec, `build-exe.yml`, all three test files, and `README.md`. I did **not** check it
+in a browser — the dashboard is a local FastAPI app rather than a Node frontend, and its
+dependencies aren't installed here (`import sqlalchemy` fails, no venv is checked in). Nothing
+I found needed a running server.
 
-I did **not** open it in a browser. `standalone/` has no venv, no installed deps, no
-`config.ini` and no DB, and `_setup_guard` (`web_server.py:66-70`) redirects every route to
-`/setup` until `config.ini` exists — creating one would mean writing a project config file,
-which this review isn't allowed to do. It also wouldn't have helped: the headline bug only
-exists in the frozen build, and a source run takes the `__file__` fallback and looks healthy.
+## First, a correction to the last review
 
-## The thing I want to flag first
+The 2026-10-13 notes said the agent branch from September was "still an empty branch (zero
+commits ahead of `main`)." It wasn't. PR #1 merged as `fac30b0` on 2026-09-22 and the fix is
+live in `places_scraper.py`. Two consecutive reviews told you to redo work that was already
+done, and the TODO's task 2 still claimed the `REQUEST_DENIED` bug as unfixed. Dropped.
 
-**The scraper is built on the legacy Places API, and the setup flow tells clients to enable
-something no new Google Cloud project can enable.** `places_scraper.py:26-27` call
-`maps.googleapis.com/maps/api/place/textsearch/json` and `/place/details/json` — the legacy
-endpoints. Google closed Places API (legacy) to new customers on 2025-03-01; projects that
-hadn't enabled it before then can't, and only Places API (New) at `places.googleapis.com/v1/`
-is offered. Existing projects are grandfathered, which is exactly why nobody has noticed.
+## The finding that matters
 
-Meanwhile `cli.py:79`, `cli.py:133` and `templates/setup.html:42` all instruct the user:
-*"console.cloud.google.com → New Project → Enable 'Places API' → Credentials → Create API
-Key."* So onboarding a second client fails at step one, and so does rotating to a fresh
-project if the current key ever leaks. `make_guide_pdf.py:96,126` says the key is "Provided by
-Schion" — the shipped product works today because it rides a single grandfathered project.
+That merged fix closed **one of two** call sites, and the asymmetry is the whole bug.
 
-Please spend two minutes confirming this in the console before anyone writes code; it decides
-whether this is rank 1 or rank 2. The migration itself is genuinely small — two functions, an
-`X-Goog-FieldMask` header, and a dict adapter so `_save_trader` doesn't change. And it fixes a
-bug that's now survived three reviews for free: legacy returns **HTTP 200** for
-`REQUEST_DENIED`, so `raise_for_status()` at `:39`/`:64` sees nothing, `results` comes back
-empty, `mark_done` at `:195` runs anyway, and `is_done` skips that area for 30 days. The new
-API returns a real 4xx, so error handling starts working by itself.
+`_text_search_page` and `get_place_details` both raise `PlacesApiError` on a non-`OK` status
+now. But an exception out of `search_places()` lands on `places_scraper.py:160-162`, which does
+`continue` *before* `mark_done` — area correctly left unmarked. An exception out of
+`get_place_details` lands on `:185-187`, a **per-place** handler that prints `[skip]` and
+continues the inner loop. The loop then runs out, `saved` is still 0, and `:209` calls
+`mark_done(db, city, state, term, 0)` anyway.
 
-## Two smaller new findings, both costing money
+So: Text Search succeeds (one call), the key gets denied or Google's QPS limiter returns
+`OVER_QUERY_LIMIT`, all 20-60 Details calls fail individually, and the area goes into
+`scraped_areas` as "done, 0 results." `ScrapedArea` (`models.py:48-53`) has no completeness
+field, so `result_count=0` is indistinguishable from a city that genuinely had no
+email-bearing businesses — you cannot detect this after the fact. `is_done`
+(`area_manager.py:13-22`) then skips that city×term for 30 days, which bites precisely in the
+mode the client uses for the 267-city run: Resume on the Scrape page.
 
-`DETAILS_FIELDS` at `places_scraper.py:28` requests `rating`, the only field there in Google's
-top-priced billing tier — it drags *every* Place Details call into that tier. And nothing ever
-reads it: `grep -rn rating standalone/` returns three lines, all writes (`:28`, `:97`,
-`models.py:33`). Not in a template, not in `score_company`, not in the CSV export
-(`web_server.py:728-740`). Deleting one word is an immediate per-call saving.
+Two more `mark_done` calls have the same defect and are deliberate: `:168` (cancel) and `:183`
+(billing limit) both mark a partially-walked area as complete. Hit Cancel on place 3 of 60 and
+the other 57 are written off for a month.
 
-`billing_guard` is more uncomfortable. It hardcodes 10,000 free calls/month per endpoint
-(`:24-25`), documents that as fact (`:4-9`), and tells the client it is "Stopping to avoid
-charges" (`:61-62`). That number matches neither pricing model — legacy was one shared $200
-monthly credit across all Maps SKUs, not two independent 10k allowances, and the post-2025
-model is per-SKU tiered caps that are all lower than 10,000 for these SKUs. So the component
-whose entire job is preventing a surprise bill will happily wave the client past the free
-allowance onto their card, and `README.md:47` repeats the wrong figure to them. It also
-increments the counter *before* the request (`:64`), so timeouts burn budget.
+The fix is a local `area_failed` flag and deleting two `mark_done` calls — explicitly *not* a
+new column, because `db.py:32-34` is `create_all`, which creates missing tables but never adds
+columns, so a new `ScrapedArea` field would raise `no such column` on every client DB already
+in the field. The single test that would have caught this: patch `httpx.get` with a side-effect
+list — Text Search `OK`, Details 200 with `OVER_QUERY_LIMIT` — and assert `ScrapedArea` is
+empty. It's a six-line variation on the test `test_places_scraper.py:22` already has.
 
-## What's carried over, and the uncomfortable part
+## What else is proposed, and why
 
-Nothing from the 2026-09-20 or 2026-10-03 lists was touched. The last commit that changed
-product code is `a08e1a3`, **2026-06-19** — almost four months ago. The only commits since are
-the two review-notes commits, and the agent branch from September is still zero commits ahead
-of `main`.
+**`cities_us.txt` still isn't in the release zip.** Fourth review, verified again today.
+`build-exe.yml` packages exactly four files and that one isn't among them; the spec bundles it
+to `_MEIPASS`, but `web_server.py:32` is the only `_MEIPASS` read site and it's for
+`templates/` only. So `--all-us` and Resume have never worked in any shipped build, and the
+Scrape page renders "0 / 0 city×term combinations searched" on every client machine. It
+survives because the dev path falls back to `Path(__file__).parent` — invisible unless you run
+a real build. A `Copy-Item` plus a CI assertion on the zip contents ends it permanently.
 
-So the top item is the same as it was in September: **`cities_us.txt` has never been in the
-release zip.** `build-exe.yml:38-42` packages four files; the spec bundles the city list into
-`_MEIPASS` but nothing reads it from there (`web_server.py:32` is the only `_MEIPASS` use and
-it's for templates). Every shipped build fails `--all-us` and `--resume`, and the Scrape page
-renders "0 / 0 city×term combinations" — while `README.md:52-58` sells `--all-us` as the
-headline feature. I kept it at rank 1 over the legacy-API finding because it is broken *today*
-for the client who actually exists, whereas the API issue blocks future ones.
+**The daily send cap.** `_sent_today()` compares `EmailLog.created_at` against *local* midnight
+while rows are written naive-UTC. At UTC+5 that means the cap counts zero between local 00:00
+and 05:00, so a campaign started at 00:30 sends the entire pending list uncapped — and
+`cli.py send`, which `README.md:34` is what tells the client to run, has no cap at all.
+Gmail's ~500/day cutoff is an account suspension, not a soft failure.
 
-Rank 3 is the send cap: `_sent_today()` (`web_server.py:149-156`) compares local midnight
-against naive-UTC `created_at` rows, so between 00:00 and 05:00 PKT it returns 0 no matter what
-was just sent — both cap checks bypassed, and a run across midnight gets a fresh allowance on
-top of the one it used. `cli.py send` has no cap at all, and `README.md:34` points the client at
-that path. Gmail suspends accounts over this.
+**Quick win** is two one-liners of docs-vs-code drift: the README still names the update
+manifest `version.json` in three places when the live constant is `Supplier_Scraper.json`
+(follow the README on the next release and the update channel silently 404s again), and
+`scrape --resume` on its own exits with "Specify --city or --all-us" despite `cli.py:9`
+documenting it as a standalone command.
 
-Rank 5 is the quick win: `README.md` names the Gist manifest `version.json` in three places
-(74, 81, 83) when the live constant is `Supplier_Scraper.json`. Follow the README on the next
-release and the update channel breaks silently for every client again, because
-`check_for_update` swallows everything (`update_checker.py:47-48`).
+**Fifth** bundles the cost items: `rating` in `DETAILS_FIELDS` is the only top-tier-priced
+field, it drags every Place Details call into that tier, and `google_rating` is read exactly
+nowhere. `billing_guard`'s 10,000-calls/month free tier matches no Google pricing model that
+has ever existed, so a guard that promises "Stopping to avoid charges" currently lets the
+client onto their card.
 
-I demoted the transient-SMTP-burns-a-contact bug to parked to make room — it's real, but it
-only bites during a campaign, and there hasn't been one. Promote it the moment sending resumes.
+## Health
 
-## Test gap, specifically
+Honestly? The code is good. It's readable, the module boundaries make sense, `job_registry`
+and `billing_guard` are thoughtful, and the thing works end to end from source. Two problems:
+six weeks idle with a severe correctness hole open, and **no CI runs the tests** —
+`build-exe.yml` triggers only on version tags and only builds the exe. The test that shipped
+with the last fix has never been executed anywhere, by its own PR description. If you only do
+one thing beyond task 1, it's the ten-line `unittest discover` job on push; that's what stops
+the next half-fix from looking like a whole one.
 
-Twelve tests, none touching `places_scraper.py` or `billing_guard.py` — the two modules that
-spend money. The single test that would have caught the most recent bug-shaped commit
-(`a08e1a3`, the compose preview) is a three-line addition at `test_core.py:107-119`: that class
-exercises `build_email_body` with a company name and with an unknown placeholder, but never
-with `company_name=None`, which is exactly the preview path at `web_server.py:427` that had to
-be fixed by hand.
-
-## Honest read
-
-The code is better than its situation — small, readable, sensibly factored, and it works end to
-end from source. But the artifact clients receive can't do its headline job, and the API it's
-built on is closed to new customers. Four months idle across three untouched TODO lists says
-the bottleneck isn't engineering, it's a decision: pick this up for a focused hour or two, or
-move it out of `01_active_projects` and stop paying for reviews that nobody acts on.
+One decision outranks the whole list and I can't make it from here: the scraper is on Places
+API **legacy** (`places_scraper.py:26-27`), closed to new Cloud projects since 2025-03-01,
+while `cli.py:79,133` and `setup.html:42` all tell the client to create a new project and
+enable it. Two minutes in the Cloud console on a fresh project answers whether a second client
+can ever be onboarded. Worth doing before you touch anything else, and worth writing the answer
+down so review five isn't guessing.

@@ -1,192 +1,54 @@
 {
-  "date": "2026-10-13",
+  "date": "2026-11-06",
   "tier": "01_active_projects",
   "selected_by": "daily routine, weighted random",
   "files_inspected": [
-    "standalone/places_scraper.py (full read)",
-    "standalone/billing_guard.py (full read)",
-    "standalone/cli.py (setup wizard, scrape, send paths)",
-    "standalone/web_server.py (daily cap, cities path, CSV export, settings)",
-    "standalone/templates/setup.html",
+    "standalone/places_scraper.py",
+    "standalone/area_manager.py",
+    "standalone/billing_guard.py",
+    "standalone/models.py",
+    "standalone/db.py",
+    "standalone/cli.py",
+    "standalone/web_server.py",
     "standalone/supplier_scraper.spec",
-    ".github/workflows/build-exe.yml",
+    "standalone/requirements_standalone.txt",
+    "standalone/cities_us.txt",
     "standalone/update_checker.py",
+    "standalone/tests/test_places_scraper.py",
     "standalone/tests/test_core.py",
     "standalone/tests/test_job_registry.py",
-    "standalone/models.py",
+    ".github/workflows/build-exe.yml",
     "README.md",
     "REFERENCE.md",
-    "TODO.md",
-    "make_guide_pdf.py",
-    "git log --oneline -30, git log -12 --date=short, git show --stat a08e1a3"
+    "TODO.md"
   ],
   "issues_confirmed": [
-    {
-      "id": "legacy-places-api",
-      "new_this_review": true,
-      "severity": "high",
-      "summary": "Scraper targets the legacy Places API, which Google closed to new customers on 2025-03-01, while the setup flow instructs clients to create a new Cloud project and enable it. Blocks onboarding any new client and blocks key/project rotation; today's build works only because it rides one grandfathered project.",
-      "evidence": [
-        "standalone/places_scraper.py:26 - maps.googleapis.com/maps/api/place/textsearch/json (legacy endpoint)",
-        "standalone/places_scraper.py:27 - maps.googleapis.com/maps/api/place/details/json (legacy endpoint)",
-        "standalone/cli.py:79 - setup prompt: \"New Project -> Enable 'Places API'\"",
-        "standalone/cli.py:133 - same copy in the setup wizard",
-        "standalone/templates/setup.html:42 - same copy on the first-run setup page",
-        "make_guide_pdf.py:96,126 - client guide says the key is 'Provided by Schion'"
-      ],
-      "needs_external_confirmation": "Open a fresh Google Cloud project and check whether 'Places API' (legacy) can still be enabled, or only 'Places API (New)'. 2 minutes, and it sets the priority."
-    },
-    {
-      "id": "rating-field-dead-and-top-tier-sku",
-      "new_this_review": true,
-      "severity": "medium",
-      "summary": "DETAILS_FIELDS requests 'rating', the only field in the top-priced Places billing tier, pulling every Place Details call into that tier. The value is never read anywhere - not in a template, not in scoring, not in the CSV export.",
-      "evidence": [
-        "standalone/places_scraper.py:28 - DETAILS_FIELDS includes 'rating'",
-        "standalone/places_scraper.py:97 - google_rating written",
-        "standalone/models.py:33 - google_rating column",
-        "grep -rn 'rating' standalone/ returns only those three lines - no read site",
-        "standalone/web_server.py:728-740 - CSV export column list omits it"
-      ]
-    },
-    {
-      "id": "billing-guard-free-tier-is-fiction",
-      "new_this_review": true,
-      "severity": "medium",
-      "summary": "billing_guard hardcodes 10,000 free calls/month per endpoint and tells the client it is 'Stopping to avoid charges', but that figure matches neither Google pricing model (legacy = one shared $200 monthly credit across SKUs; post-2025 = per-SKU Essentials/Pro/Enterprise caps, all below 10,000 for these SKUs). The guard lets the client run past the free allowance onto their card. Counter also increments before the HTTP request, so timeouts burn budget.",
-      "evidence": [
-        "standalone/billing_guard.py:4-9 - docstring asserts 10,000/month per endpoint",
-        "standalone/billing_guard.py:24-25 - FREE_TEXT_SEARCH = FREE_PLACE_DETAILS = 10_000",
-        "standalone/billing_guard.py:61-62 - 'Stopping to avoid charges' message",
-        "standalone/billing_guard.py:64 - increment precedes the request",
-        "README.md:47 - repeats '10k free calls/month per endpoint' to the client"
-      ]
-    },
-    {
-      "id": "cities-txt-never-in-release-zip",
-      "new_this_review": false,
-      "carried_from": "2026-09-20 and 2026-10-03, untouched both times",
-      "severity": "high",
-      "summary": "cities_us.txt has never been packaged into the release zip, so --all-us and --resume fail on every client machine and the Scrape page renders '0 / 0 city x term combinations'. The spec bundles it into _MEIPASS, but nothing reads cities_us.txt from _MEIPASS. Dev runs work via the __file__ fallback, which is why it keeps surviving review.",
-      "evidence": [
-        ".github/workflows/build-exe.yml:38-42 - Compress-Archive lists exe, config.ini, README.md, SETUP_GUIDE.pdf only",
-        "standalone/supplier_scraper.spec:16-17 - cities_us.txt and search_terms.txt in datas (unpacked to _MEIPASS)",
-        "standalone/web_server.py:32 - the only _MEIPASS read in the repo, and it is for templates/ only",
-        "standalone/cli.py:23,28 - frozen path is Path(sys.executable).parent / 'cities_us.txt'",
-        "standalone/web_server.py:566,627 - same frozen path at both scrape read sites",
-        "standalone/cli.py:261 - prints 'cities_us.txt not found' and exits 1",
-        "standalone/web_server.py:668 - 'No cities loaded. Check cities_us.txt' redirect"
-      ]
-    },
-    {
-      "id": "daily-send-cap-five-hour-hole",
-      "new_this_review": false,
-      "carried_from": "2026-10-03, untouched",
-      "severity": "high",
-      "summary": "_sent_today() compares local midnight against naive-UTC created_at rows, so between 00:00 and 05:00 PKT it returns 0 regardless of how much was just sent - both the pre-flight check and the in-loop re-check are bypassed. Separately, cli.py send has no cap at all, only throttle pacing, and README.md:34 points the client at that path.",
-      "evidence": [
-        "standalone/web_server.py:149-156 - _sent_today uses datetime.combine(date.today(), min.time()), local naive",
-        "standalone/web_server.py:537 - created_at=datetime.utcnow()",
-        "standalone/cli.py:373 - created_at=datetime.utcnow()",
-        "standalone/web_server.py:486,516 - the two cap checks that depend on _sent_today",
-        "standalone/cli.py:318-335 - CLI send reads throttle_per_minute only, no _daily_cap/_sent_today",
-        "standalone/cli.py:325 vs web_server.py:491 - throttle defaults disagree (30 vs 20)",
-        "README.md:34 - instructs 'cli.py send --priority-only', the uncapped path"
-      ]
-    },
-    {
-      "id": "places-error-status-never-checked",
-      "new_this_review": false,
-      "carried_from": "2026-09-20 and 2026-10-03, untouched",
-      "severity": "high",
-      "summary": "Legacy Places returns HTTP 200 for REQUEST_DENIED / OVER_QUERY_LIMIT / INVALID_REQUEST with the error in the JSON status field, but only raise_for_status() is called. A denied key yields results=[], saved stays 0, mark_done still runs, and is_done then skips the area for 30 days. Also silently truncates pagination at 20 results.",
-      "evidence": [
-        "standalone/places_scraper.py:38-40 - _text_search_page: raise_for_status only, no data['status'] read",
-        "standalone/places_scraper.py:61-65 - get_place_details: same",
-        "standalone/places_scraper.py:51 - data.get('results', []) swallows the error shape",
-        "standalone/places_scraper.py:195 - mark_done runs unconditionally after the loop",
-        "standalone/area_manager.py:13-22 - is_done then skips for rescrape_days (30)",
-        "standalone/places_scraper.py:146-148 - except Exception: continue treats auth failure as 'move on'"
-      ],
-      "note": "Migrating to Places API (New) fixes this for free - the new API returns real 4xx codes, so raise_for_status starts working. Folded into TODO task 2."
-    },
-    {
-      "id": "transient-smtp-burns-contact",
-      "new_this_review": false,
-      "carried_from": "2026-09-20 and 2026-10-03, untouched",
-      "severity": "medium",
-      "summary": "Any exception in send_one returns success=False, and both callers write email_status='bounced', which is permanent - the send query requires 'pending' and the only UI reset does not clear email_status. A brief network blip silently retires every prospect in flight.",
-      "evidence": [
-        "standalone/email_sender.py:114-115 - bare except returns {'success': False}",
-        "standalone/web_server.py:523 and standalone/cli.py:359 - both write 'bounced'",
-        "standalone/web_server.py:458 and standalone/cli.py:332 - send query requires email_status == 'pending'",
-        "standalone/web_server.py:214-225 - /contacts/{id}/reset clears approved, not email_status",
-        "standalone/web_server.py:235 - 'bounced' also used as the unsubscribe sentinel"
-      ],
-      "note": "Demoted to parked this review to make room for the legacy-API finding. Promote if a campaign is about to run."
-    },
-    {
-      "id": "no-tests-on-the-money-spending-modules",
-      "new_this_review": true,
-      "severity": "medium",
-      "summary": "12 tests total (8 in test_core.py, 4 in test_job_registry.py). Zero cover places_scraper.py or billing_guard.py - the two modules that spend the client's money - or email_sender.send_one, the daily cap, or any HTTP route. The single test that would have caught the most recent bug-shaped commit (a08e1a3, compose preview with company_name=None) is a three-line addition next to test_core.py:107-119, which tests that function with a name and with an unknown placeholder but never with None.",
-      "evidence": [
-        "standalone/tests/test_core.py - 123 lines, 8 test methods, 4 TestCase classes",
-        "standalone/tests/test_job_registry.py - 75 lines, 4 test methods",
-        "standalone/tests/test_core.py:107-119 - EmailTemplateTests, no company_name=None case",
-        "standalone/web_server.py:427 - the compose-preview call site a08e1a3 had to fix by hand"
-      ]
-    },
-    {
-      "id": "four-months-idle",
-      "new_this_review": true,
-      "severity": "process",
-      "summary": "Last product-code commit is a08e1a3 dated 2026-06-19 - almost four months ago. The only commits since are the two daily-review notes commits. The 2026-09-20 agent branch is still zero commits ahead of main. Nothing from either prior TODO was acted on.",
-      "evidence": [
-        "git log -12 --date=short - a08e1a3 2026-06-19, then f9aca4c 2026-09-20 and d302a0c 2026-10-03, both 'chore: daily review notes'",
-        "agent/2026-09-20-google-places-error-statuses-are-never-c - empty branch, 0 commits ahead of main"
-      ]
-    }
+    "standalone/places_scraper.py:185-187,209 — a PlacesApiError from get_place_details is swallowed per-place by `except Exception: continue`, the inner loop ends with saved==0, and mark_done() at :209 still runs. area_manager.py:13-22 then treats the area as done for rescrape_days (30), so a denied key or OVER_QUERY_LIMIT mid-area permanently poisons Resume for that city×term. PR #1 (fac30b0) closed this on the Text Search path only, because run_places_scrape:160-162 does `continue` before mark_done.",
+    "standalone/places_scraper.py:168-169 — cancelling mid-area calls mark_done(saved), writing off every place not yet processed in that area for 30 days.",
+    "standalone/places_scraper.py:183-184 — BillingLimitError mid-area does the same.",
+    "standalone/models.py:48-53 — ScrapedArea has only id/scraped_at/result_count, no completeness field, so result_count=0 from a failed area is indistinguishable from a legitimately empty city. standalone/db.py:32-34 uses create_all, which never adds columns, so adding one would raise `no such column` on existing client DBs.",
+    ".github/workflows/build-exe.yml — the Package step Copy-Items only config.ini/README.md/SETUP_GUIDE.pdf and Compress-Archive lists exactly four files; cities_us.txt is absent. supplier_scraper.spec:15-16 bundles it into _MEIPASS, but web_server.py:32 is the only _MEIPASS read site and covers templates/ only, so the bundled copy is unreachable from cli.py:28, web_server.py:567 and :631, which all read Path(sys.executable).parent / 'cities_us.txt'.",
+    "standalone/web_server.py:150-157 — _sent_today() compares EmailLog.created_at against local midnight (datetime.combine(date.today(), min.time())), but rows are written naive-UTC at web_server.py:538 and cli.py:371. At UTC+5 the daily cap counts 0 between local 00:00 and 05:00, so the pre-flight check at :486 and the in-loop re-check at :513 both pass unconditionally.",
+    "standalone/cli.py:311-383 — the send command applies no daily cap at all: no _daily_cap(), no _sent_today(), only throttle pacing at cli.py:325 (default 30/min vs web_server.py:491's 20/min). README.md:34 instructs the client to use this path.",
+    "standalone/cli.py:258-267 — `scrape --resume` without --city or --all-us falls through to the else branch and sys.exit(1) with 'Specify --city or --all-us', despite cli.py:9 and the --resume help at :231 documenting it as a standalone command.",
+    "README.md:74,81,83 — still name the update manifest `version.json`; the live constant at standalone/update_checker.py:15 is `Supplier_Scraper.json` (fixed in a08e1a3). update_checker.py:47-48 swallows every exception, so a wrong filename 404s silently.",
+    "standalone/billing_guard.py:4-9,24-25 — docstring and constants assert a flat 10,000 calls/month/endpoint free tier matching neither the legacy shared $200 credit nor the post-2025 per-SKU tiers; :60-63 nonetheless tells the client it is 'Stopping to avoid charges.' README.md:47 repeats the number.",
+    "standalone/billing_guard.py:64 — the counter is incremented inside _check_and_increment, i.e. before the HTTP request at places_scraper.py:44 and :71, so a timeout consumes budget.",
+    "standalone/places_scraper.py:28 — DETAILS_FIELDS includes `rating`, the only top-tier-priced field, which drags every Place Details call into that tier. google_rating is written at :111 and declared at models.py:33 but read nowhere: no template, no scorer, no CSV export.",
+    "standalone/requirements_standalone.txt:6-7 — pins beautifulsoup4==4.12.3 and lxml>=5.2.1; neither is imported anywhere in standalone/ (extraction is regex, website_email_extractor.py:8). lxml is unpinned in the pipeline that builds the client artifact.",
+    "No CI runs the tests — build-exe.yml triggers only on v*.*.* tags and only builds the exe. The test_places_scraper.py added by PR #1 has never been executed (its own PR body states the sandbox lacked sqlalchemy/httpx); same today, no venv is present and `import sqlalchemy` fails.",
+    "standalone/cities_us.txt — 13 duplicate entries out of 267 non-comment lines, each costing a redundant Text Search per term.",
+    "standalone/web_server.py:578-581 vs :641 and cli.py:94-96 — _scrape_page_ctx counts every non-comment line as a city while both consumers require a comma, so the progress denominator and the real city list can diverge (all 267 current lines have a comma, so it does not bite today)."
   ],
   "browser_checked": false,
-  "browser_note": "Not run. standalone/ has no .venv, no installed deps, no config.ini and no supplier_scraper.db, and _setup_guard (web_server.py:66-70) redirects every route to /setup until config.ini exists - creating one would mean writing a project config file, which this review is not allowed to do. More to the point, the headline finding is specific to the frozen PyInstaller build (Path(sys.executable).parent), which a source run cannot reproduce: in dev the __file__ fallback at cli.py:25 / web_server.py:630 finds cities_us.txt and everything looks fine. Verified by reading all five frozen/dev path resolution sites instead.",
+  "browser_note": "Not attempted. The dashboard is a local FastAPI/Jinja app, not a Node frontend, and its dependencies are not installed here (`import sqlalchemy` -> ModuleNotFoundError, no venv checked in). Every finding below came from reading code; none needed a running server.",
   "proposed_tasks": [
-    {
-      "rank": 1,
-      "kind": "BUG",
-      "title": "Ship cities_us.txt in the release zip (plus a _MEIPASS fallback and a CI assertion)",
-      "estimate": "45 min",
-      "anchors": [".github/workflows/build-exe.yml:38-42", "standalone/supplier_scraper.spec:16-17", "standalone/cli.py:22-28", "standalone/web_server.py:566,627"]
-    },
-    {
-      "rank": 2,
-      "kind": "BUG",
-      "title": "Migrate the two Places call sites to Places API (New) behind an adapter - also fixes the silent REQUEST_DENIED bug",
-      "estimate": "1 hour",
-      "anchors": ["standalone/places_scraper.py:26-27", "standalone/places_scraper.py:33-65", "standalone/cli.py:79,133", "standalone/templates/setup.html:42"]
-    },
-    {
-      "rank": 3,
-      "kind": "BUG",
-      "title": "One shared daily send cap for both send paths, compared in a single consistent timezone",
-      "estimate": "45 min",
-      "anchors": ["standalone/web_server.py:149-156", "standalone/web_server.py:486,516,537", "standalone/cli.py:311-384"]
-    },
-    {
-      "rank": 4,
-      "kind": "IMPROVEMENT",
-      "title": "Drop 'rating' from DETAILS_FIELDS and replace billing_guard's fictional free-tier numbers with the real ones",
-      "estimate": "30 min",
-      "anchors": ["standalone/places_scraper.py:28", "standalone/billing_guard.py:4-9,24-25,64", "README.md:47"]
-    },
-    {
-      "rank": 5,
-      "kind": "QUICK WIN ~15min",
-      "title": "Fix the wrong Gist manifest filename in README.md (3 places) before it re-breaks the update banner",
-      "estimate": "15 min",
-      "anchors": ["README.md:74,81,83", "standalone/update_checker.py:13-15", "standalone/update_checker.py:47-48"]
-    }
+    "[BUG] Guard mark_done so a Place Details failure, a cancel, or a billing stop no longer records a half-scraped area as done (places_scraper.py:168,183,209) — plus the mocked OVER_QUERY_LIMIT-on-details test that would have caught it. ~45 min.",
+    "[BUG] Ship cities_us.txt in the release zip and assert it in CI; --all-us and Resume have never worked in a shipped build (build-exe.yml). Fourth review. ~45 min.",
+    "[BUG] Give both send paths one shared daily cap and fix the local-vs-UTC day window (web_server.py:150-157, cli.py:311-383). ~45 min.",
+    "[QUICK WIN ~15min] Correct the three README version.json -> Supplier_Scraper.json references, and make `scrape --resume` imply --all-us (cli.py:258) so the documented command stops exiting 1.",
+    "[IMPROVEMENT] Drop `rating` from DETAILS_FIELDS, replace billing_guard's invented free-tier numbers with the real ones, and increment the counter after a successful response (places_scraper.py:28, billing_guard.py:24-25,64). ~30 min."
   ],
-  "verdict": "Solid, well-factored little product that works from source and is quietly broken where it counts: the shipped exe cannot do its headline --all-us scrape, and the scraper is built on a Google API no new client can enable. Four months idle with three untouched TODO lists - the code is not the bottleneck, the decision to pick it up or formally park it is.",
-  "next_review": "2026-10-23"
+  "verdict": "Solid, genuinely working product with one severe correctness hole and one release-packaging hole that have each outlived multiple reviews; the code is well-organised and readable, but six weeks idle and zero CI mean nothing here is verified — including the test that shipped with the last fix.",
+  "next_review": "2026-11-16"
 }
